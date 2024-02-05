@@ -11,16 +11,16 @@ over its corresponding probability space  ( Ω_Y, Y, I) using a finite
 element discretisation consisting of n_bins
 """
 
-# Currently the range of the function Y(x) only goes from 0,1 how to change this
-
 # How to recover F from F_hat if the mesh is triangles rather than an interval?
 
 # Would it be more efficient to import only certain parts of the library??
-import numpy as np
-import matplotlib.pyplot as plt
-from firedrake import *
-import pyvista as pv
 
+# LTS for the interpolate method what should I be using??
+
+import os
+os.environ["OMP_NUM_THREADS"] = "1"
+from firedrake import *
+import numpy as np
 
 class FEptp(object):
 
@@ -53,8 +53,9 @@ class FEptp(object):
     def indicator(self):
 
         """
-        Define the indicator function I(y,x=(x1,x2)) which acts on the random function Y(x1,x2)
+        Defines the indicator function I(y,x=(x1,x2)) which acts on the random function Y(x1,x2)
         """
+
         if self.Xdim == 1:
             x1,   y = SpatialCoordinate(self.m_yx)
         elif self.Xdim == 2:
@@ -64,24 +65,30 @@ class FEptp(object):
 
         return I;
 
-    def domain(self, Omega = {'x1':(-1,1),'x2':(-1,1)}, N_elements = 10):
+    def domain(self, Omega_X = {'x1':(-1,1),'x2':(-1,1)}, Omega_Y = {'Y':(0,1)}, N_elements = 10):
         
         """
-        Construct the extruded mesh 
-            Ω x Ω_Y
-        the physical space times the event space
+        Constructs the extruded mesh Ω_X x Ω_Y given by the physical space Ω_X times the event space Ω_Y
+
+        Inputs: 
+
+        Omega_X 'dict' - Physical domain 
+        Omega_Y 'dict' - Probability space 
+        N_elements int - Number of finite elements 
+            
         """
-        self.Xdim = len(Omega)
+
+        self.Xdim = len(Omega_X)
 
         # x-direction
         if   self.Xdim == 1:
             print('1D mesh')
             cell_type = "interval";  
-            mesh_x    = IntervalMesh(ncells=1,length_or_left=Omega['x1'][0],right=Omega['x1'][1])
+            mesh_x    = IntervalMesh(ncells=1,length_or_left=Omega_X['x1'][0],right=Omega_X['x1'][1])
         elif self.Xdim == 2:
             print('2D mesh')
             cell_type = "triangle";
-            mesh_x    = RectangleMesh(nx=1,ny=1,Lx=Omega['x1'][1],Ly=Omega['x2'][1],originX=Omega['x1'][0],originY=Omega['x2'][0])
+            mesh_x    = RectangleMesh(nx=1,ny=1,Lx=Omega_X['x1'][1],Ly=Omega_X['x2'][1],originX=Omega_X['x1'][0],originY=Omega_X['x2'][0])
         else:
             raise ValueError('The domain Ω must be 1D or 2D \n')
 
@@ -89,7 +96,7 @@ class FEptp(object):
         T_element = TensorProductElement(R,self.V_FE)
 
         # Add y-direction
-        self.m_y  = IntervalMesh(        ncells=N_elements,length_or_left=0,right=1) 
+        self.m_y  = IntervalMesh(        ncells=N_elements,length_or_left=Omega_Y['Y'][0],right=Omega_Y['Y'][1]) 
         self.m_yx = ExtrudedMesh(mesh_x, layers=N_elements,layer_height=1./N_elements,extrusion_type='uniform')
         
         File("Exruded_Mesh.pvd").write(self.m_yx)
@@ -97,16 +104,22 @@ class FEptp(object):
         # Function-spaces
         self.V_f     = FunctionSpace(mesh=self.m_y ,family=self.V_fE)
         self.V_F     = FunctionSpace(mesh=self.m_y ,family=self.V_FE)
-        self.V_F_hat = FunctionSpace(mesh=self.m_yx,family=T_element) # extension of V_F into x     
-        
+        self.V_F_hat = FunctionSpace(mesh=self.m_yx,family=T_element) # extension of V_F into x   
+
+        # Mapping 
+        self.Omega_Y_to_01 = lambda Y:  Y/(Omega_Y['Y'][1]-Omega_Y['Y'][0]) - Omega_Y['Y'][0]/(Omega_Y['Y'][1]-Omega_Y['Y'][0])
+
         return SpatialCoordinate(self.m_yx)
 
     def CDF(self,quadrature_degree):
 
         """
-        Construct the CDF F_Y(y) of the random function Y(x)
-        by projecting from physical space into the probability 
-        space specified.
+        Construct the CDF F_Y(y) of the random function Y(x) by projecting from physical space into the probability space specified.
+
+        Inputs:
+
+        quadrature_degree int - order of the numerical quadrature scheme to use
+
         """
         
         # Define trial & test functions on V_F_hat
@@ -127,8 +140,9 @@ class FEptp(object):
         # Sort a linear function in ascending order 
         # this creates a DOF map which matches 
         # the extended mesh which are in ascending order
+        from firedrake.__future__ import interpolate
         y,  = SpatialCoordinate(self.m_y)
-        ys  = interpolate(y,self.V_F)
+        ys  = assemble(interpolate(y,self.V_F))
         indx= np.argsort(ys.dat.data)
 
         # Pass F_hat into F
@@ -137,16 +151,18 @@ class FEptp(object):
         else:
             self.F.dat.data[indx] = 0.5*(F_hat.dat.data[:len(indx)] + F_hat.dat.data[len(indx):])
 
-        print('CDF int F ds = ',assemble(self.F*ds),'\n')
+        # Check CDF properties
+        Surf_int = assemble(self.F*ds)
+        if abs(Surf_int - 1) > 1e-02:
+            print("Calculated F(+∞) - F(-∞) should equal 1, got %e. Check the domain of Ω_Y and the quadrature_degree specified."%Surf_int)
+            #raise ValueError("Calculated F(+∞) - F(-∞) should equal 1, got %e. Check the domain of Ω_Y and the quadrature_degree specified."%Surf_int)
 
         return None;
 
     def PDF(self):
 
         """
-        Construct the PDF f_Y(y) = ∂y F_Y(y) of the random function Y(x)
-        by constructing a projecting of the above relation and putting the 
-        the derivative onto the test function.
+        Construct the PDF f_Y(y) of the random function Y(x) by projecting f_Y(y) = ∂y F_Y(y)
         """
 
         # Define trial & test functions on V_f
@@ -161,31 +177,42 @@ class FEptp(object):
         self.f = Function(self.V_f)
         solve(a == L, self.f)
 
-        # Check it integrates to 1
-        print('int f dx = ',assemble(self.f*dx),'\n')
+        # Check PDF properties
+        PDF_int = assemble(self.f*dx)
+        if abs(PDF_int - 1) > 1e-02:
+            print("Calculated ∫ f(y) dy should equal 1, but got %e. Check the quadrature_degree used. "%PDF_int)
+            #raise ValueError("Calculated ∫ f(y) dy should equal 1, but got %e. Check the quadrature_degree used. "%PDF_int)
 
         return None;    
 
     def fit(self,function_Y,quadrature_degree=500):
 
         """
+        Constructs the CDF F_Y(y) and the PDF f_Y(y) of the function Y(X)
+
+        Inputs:
+
+            function_Y 'ufl expression' - the random function Y(X)
+            quadrature_degree int - order of the numerical quadrature scheme to use
+        """     
+
+        # Assign input & map to Y \in Ω_Y |-> [0,1]   
+        self.Y = self.Omega_Y_to_01(function_Y) 
         
-        """        
-        self.Y = function_Y # Assign input
-        self.CDF(quadrature_degree) # Solve for the CDF
-        self.PDF() # Solve for the PDF
+        # Solve for the CDF, PDF and map back y \in [0,1] |-> Ω_Y 
+        self.CDF(quadrature_degree)
+        self.PDF()
 
         return None;
 
-    def evaluate(self,y):
-
-        raise NotImplementedError
-    
     def plot(self):
         
         """
-        
+        Visualise the CDF and PDF using the inbuilt plotting routines
         """
+
+        import matplotlib.pyplot as plt
+        from firedrake.pyplot import plot
 
         try:
             Line2D_F = plot(self.F,num_sample_points=50)
@@ -209,56 +236,61 @@ class FEptp(object):
 
         return None
 
-    # Convinience functions
-    def vis_indicator(self):
+    def evaluate(self,y):
 
-        # Visualisation of the indicator function
-        N_vis = 50
+        """
+        Returns the CDF and PDF evaluated an the point(s) y
+
+        Inputs:
+            y 'array or list' - [0, 0.1, ... ,1] the locations to evaluate 
         
-        # x-direction
-        if self.Xdim == 1:
-            cell_type = "interval";  
-            mI_x = IntervalMesh(N_vis,0,1); 
-        elif self.Xdim == 2:
-            cell_type = "triangle";
-            mI_x  = RectangleMesh(N_vis,N_vis,Lx=2*np.pi,Ly=np.pi, originX=0.0, originY=0.0);
-        # y-direction
-        meshI = ExtrudedMesh(mI_x, layers=N_vis) 
+        Returns:
+            F_Y- 'array' CDF evaluated at y
+            f_Y- 'array' PDF evaluated at y
+            y  - 'array' locations y
 
-        # Set the function-space V_I
-        W   = FiniteElement(family="DG",cell=cell_type ,degree=0)
-        V_F = FiniteElement(family="DG",cell="interval",degree=0)
+        """
 
-        elt_WVF = TensorProductElement(W,V_F)
-        V_I     = FunctionSpace(meshI,elt_WVF)
+        F_Y = np.asarray(self.F.at(y))
 
-        I = Function(V_I)
-        I.interpolate( self.indicator() )
-        File("Indicator_Function.pvd").write(I)
+        f_Y = np.asarray(self.f.at(y))
 
-        reader = pv.get_reader(filename="Indicator_Function.pvd")
-        fdrake_mesh = reader.read()[0]
-        fdrake_mesh.plot(cmap='coolwarm') #cpos='xy'
+        y_i = np.asarray(y)
 
-        return None;
-
+        return F_Y,f_Y,y_i;
+    
     def __str__(self):
-        s= ( 'Continuation succeed \n');
+
+        """
+        Print details of the FEptp object
+        """
+        
+        s= ( 'Approximation spaces: \n'
+            + 'CDF F_Y(y) \n'
+            + 'PDF f_Y(y) \n'
+            + 'domain Ω \n'
+            + 'N elements %d \n');
+        
         return s
         
 if __name__ == "__main__":
 
-    # %%    
-    print("Initialising library \n")
-
     # %%
-    ptp   = FEptp()
+    # 1D example
+    ptp  = FEptp()
 
-    x1,x2,y = ptp.domain(Omega = {'x1':(0,2*np.pi),'x2':(0,2*np.pi)}, N_elements=10)
-    ptp.fit(function_Y = sin(x1)**2 + sin(x2)**2, quadrature_degree=150)
+    x1,y = ptp.domain(Omega_X = {'x1':(0,1)}, Omega_Y = {'Y':(0,1)}, N_elements=100)
+    ptp.fit(function_Y = x1**(3/2), quadrature_degree=1000)
 
-    # x1,y = ptp.domain(Omega = {'x1':(0,1)}, N_elements=10)
-    # ptp.fit(function_Y = sin(x1)**2, quadrature_degree=200)
+    F_Y,f_Y,y_i  = ptp.evaluate(y = [0., 0.1, 0.2])
 
     ptp.plot()
-    print("Testing")
+
+    # %%
+    # 2D example
+    # ptp  = FEptp()
+
+    # x1,x2,y = ptp.domain(Omega_X = {'x1':(0,1),'x2':(0,1)}, Omega_Y = {'Y':(0,2)}, N_elements=50)
+    # ptp.fit(function_Y = x1 + x2, quadrature_degree=200)
+
+    # ptp.plot()
