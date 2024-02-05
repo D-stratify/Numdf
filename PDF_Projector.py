@@ -1,21 +1,17 @@
 """
-class which given a user provided "function" over a physical "domain"
+FEptp class - Finite Element physical to probability 
 
-    Y(x) where x in Ω
+Given a user provided "function" over a physical "domain"
 
-returns the "CDF" & "PDF"
+    Y(X) where X in Ω_X
+
+this class uses the fit method to return the "CDF" & "PDF"
 
     F_Y(y), f_Y(y)
 
-over its corresponding probability space  ( Ω_Y, Y, I) using a finite 
-element discretisation consisting of n_bins
+over their corresponding probability space Ω_Y. The method uses 
+a finite element discretisation consisting of n elements (bins).
 """
-
-# How to recover F from F_hat if the mesh is triangles rather than an interval?
-
-# Would it be more efficient to import only certain parts of the library??
-
-# LTS for the interpolate method what should I be using??
 
 import os
 os.environ["OMP_NUM_THREADS"] = "1"
@@ -269,28 +265,29 @@ class FEptp(object):
             + 'CDF F_Y(y) \n'
             + 'PDF f_Y(y) \n'
             + 'domain Ω \n'
-            + 'N elements %d \n');
+            + 'N elements \n');
         
         return s
         
 if __name__ == "__main__":
 
     # %%
-    # 1D example
-    ptp  = FEptp()
+    # Specifiy the function spaces for the CDF & PDF
+    ptp = FEptp(func_space_CDF = {"family":"DG","degree":1},func_space_PDF= {"family":"CG","degree":1})
 
+    # (a) Specify the domain size(s) and number of finite elements/bins 
+    # (b) Projection Y(X) into probability space
+    # (c) Plot out the functions
+
+    # 1D example
     x1,y = ptp.domain(Omega_X = {'x1':(0,1)}, Omega_Y = {'Y':(0,1)}, N_elements=100)
     ptp.fit(function_Y = x1**(3/2), quadrature_degree=1000)
-
-    F_Y,f_Y,y_i  = ptp.evaluate(y = [0., 0.1, 0.2])
-
     ptp.plot()
 
-    # %%
     # 2D example
-    # ptp  = FEptp()
+    x1,x2,y = ptp.domain(Omega_X = {'x1':(0,1),'x2':(0,1)}, Omega_Y = {'Y':(0,2)}, N_elements=50)
+    ptp.fit(function_Y = x1 + x2, quadrature_degree=200)
+    ptp.plot()
 
-    # x1,x2,y = ptp.domain(Omega_X = {'x1':(0,1),'x2':(0,1)}, Omega_Y = {'Y':(0,2)}, N_elements=50)
-    # ptp.fit(function_Y = x1 + x2, quadrature_degree=200)
-
-    # ptp.plot()
+    # Evaluate the CDF & PDF at points
+    F_Y,f_Y,y_i  = ptp.evaluate(y = [0., 0.1, 0.2])
