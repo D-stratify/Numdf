@@ -155,6 +155,30 @@ class FEptp(object):
 
         return None;
 
+    def QDF(self):
+        
+        """
+        Construct the QDF (inverse CDF) Q_Y(y) of the random function Y(x) by inverting F_Y(y)
+        """
+
+        # Obtain the p values from F & the z values associated with them
+        ##p = self.F.dat.data[:]
+        ###z = self.F.dat.data[:]
+
+        # Sort the p array lexicographically
+
+        # Make a 1D mesh where the vertices are given by the sorted p values
+
+        # Define a function on this mesh
+        # Create a function for Q(p)
+        ## self.Q = 
+
+        # Assign it the z values of F_Z(z) 
+        
+        raise NotImplementedError
+    
+        return None;
+        
     def PDF(self):
 
         """
@@ -271,23 +295,26 @@ class FEptp(object):
         
 if __name__ == "__main__":
 
+    #%%
+    print("Initialise")
+    
     # %%
     # Specifiy the function spaces for the CDF & PDF
-    ptp = FEptp(func_space_CDF = {"family":"DG","degree":1},func_space_PDF= {"family":"CG","degree":1})
+    ptp = FEptp(func_space_CDF = {"family":"DG","degree":0},func_space_PDF= {"family":"DG","degree":0})
 
     # (a) Specify the domain size(s) and number of finite elements/bins 
     # (b) Projection Y(X) into probability space
     # (c) Plot out the functions
 
     # 1D example
-    x1,y = ptp.domain(Omega_X = {'x1':(0,1)}, Omega_Y = {'Y':(0,1)}, N_elements=100)
-    ptp.fit(function_Y = x1**(3/2), quadrature_degree=1000)
+    x1,y = ptp.domain(Omega_X = {'x1':(0,1)}, Omega_Y = {'Y':(0,1)}, N_elements=10)
+    ptp.fit(function_Y = x1, quadrature_degree=500)
     ptp.plot()
 
     # 2D example
-    x1,x2,y = ptp.domain(Omega_X = {'x1':(0,1),'x2':(0,1)}, Omega_Y = {'Y':(0,2)}, N_elements=50)
-    ptp.fit(function_Y = x1 + x2, quadrature_degree=200)
-    ptp.plot()
+    # x1,x2,y = ptp.domain(Omega_X = {'x1':(0,1),'x2':(0,1)}, Omega_Y = {'Y':(0,2)}, N_elements=50)
+    # ptp.fit(function_Y = x1 + x2, quadrature_degree=200)
+    # ptp.plot()
 
-    # Evaluate the CDF & PDF at points
-    F_Y,f_Y,y_i  = ptp.evaluate(y = [0., 0.1, 0.2])
+    # # Evaluate the CDF & PDF at points
+    # F_Y,f_Y,y_i  = ptp.evaluate(y = [0., 0.1, 0.2])
