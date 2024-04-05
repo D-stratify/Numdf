@@ -16,6 +16,7 @@ a finite element discretisation consisting of n elements (bins).
 import os
 os.environ["OMP_NUM_THREADS"] = "1"
 from firedrake import *
+parameters["reorder_meshes"] = False
 import numpy as np
 
 class FEptp(object):
@@ -161,22 +162,33 @@ class FEptp(object):
         Construct the QDF (inverse CDF) Q_Y(y) of the random function Y(x) by inverting F_Y(y)
         """
 
-        # Obtain the p values from F & the z values associated with them
-        ##p = self.F.dat.data[:]
-        ###z = self.F.dat.data[:]
+        # From the CDF F obtain the F_i & y_i values as a list [(F_i,y_i),....]
+        F_i  = self.F.dat.data[:]
+        mesh = self.F.function_space().mesh()
+        y_i  = mesh.coordinates.dat.data[:] # This needs to be fixed!!
+        print('F_i =',F_i)
+        print('y_i =',y_i)
 
         # Sort the p array lexicographically
+        indx = np.argsort(F_i)
+        p    = F_i[indx]
+        #Q_i  = y_i[indx] # This needs to be fixed
 
         # Make a 1D mesh where the vertices are given by the sorted p values
+        layers = p[1:] - p[:-1];
+        m_u    = UnitIntervalMesh(ncells=1);
+        mesh   = ExtrudedMesh(mesh=m_u, layers=len(layers), layer_height=layers, extrusion_type='uniform')
+        print(layers)
 
-        # Define a function on this mesh
-        # Create a function for Q(p)
-        ## self.Q = 
+        # Create a function Q(p) on this mesh
+        R         = FiniteElement(family="DG",cell="interval",degree=0)
+        T_element = TensorProductElement(R,self.V_FE)
+        self.V_Q  = FunctionSpace(mesh=mesh ,family=T_element)
+        self.Q    = Function(self.V_Q)
 
-        # Assign it the z values of F_Z(z) 
+        # Assign Q(p_i) = Q_i
+        #self.Q.dat.data[:] = Q_i; # This needs to be fixed
         
-        raise NotImplementedError
-    
         return None;
         
     def PDF(self):
@@ -221,6 +233,7 @@ class FEptp(object):
         
         # Solve for the CDF, PDF and map back y \in [0,1] |-> Ω_Y 
         self.CDF(quadrature_degree)
+        self.QDF()
         self.PDF()
 
         return None;
@@ -244,15 +257,25 @@ class FEptp(object):
         except Exception as e:
             warning("Cannot plot figure. Error msg: '%s'" % e)
 
-        try:
-            Line2D_f = plot(self.f,num_sample_points=50)
-            plt.title(r'PDF',fontsize=20)
-            plt.ylabel(r'$f_Y$',fontsize=20)
-            plt.xlabel(r'$y$',fontsize=20)
-            plt.tight_layout()
-            plt.show()
-        except Exception as e:
-            warning("Cannot plot figure. Error msg: '%s'" % e)
+        # try:
+        #     Line2D_f = plot(self.F,num_sample_points=50)
+        #     plt.title(r'QDF',fontsize=20)
+        #     plt.ylabel(r'$Q_Y$',fontsize=20)
+        #     plt.xlabel(r'$p$',fontsize=20)
+        #     plt.tight_layout()
+        #     plt.show()
+        # except Exception as e:
+        #     warning("Cannot plot figure. Error msg: '%s'" % e)
+
+        # try:
+        #     Line2D_f = plot(self.f,num_sample_points=50)
+        #     plt.title(r'PDF',fontsize=20)
+        #     plt.ylabel(r'$f_Y$',fontsize=20)
+        #     plt.xlabel(r'$y$',fontsize=20)
+        #     plt.tight_layout()
+        #     plt.show()
+        # except Exception as e:
+        #     warning("Cannot plot figure. Error msg: '%s'" % e)
 
         return None
 
@@ -300,15 +323,15 @@ if __name__ == "__main__":
     
     # %%
     # Specifiy the function spaces for the CDF & PDF
-    ptp = FEptp(func_space_CDF = {"family":"DG","degree":0},func_space_PDF= {"family":"DG","degree":0})
+    ptp = FEptp(func_space_CDF = {"family":"DG","degree":1},func_space_PDF= {"family":"DG","degree":0})
 
     # (a) Specify the domain size(s) and number of finite elements/bins 
     # (b) Projection Y(X) into probability space
     # (c) Plot out the functions
 
     # 1D example
-    x1,y = ptp.domain(Omega_X = {'x1':(0,1)}, Omega_Y = {'Y':(0,1)}, N_elements=10)
-    ptp.fit(function_Y = x1, quadrature_degree=500)
+    x1,y = ptp.domain(Omega_X = {'x1':(0,1)}, Omega_Y = {'Y':(0,1)}, N_elements=4)
+    ptp.fit(function_Y = x1, quadrature_degree=20)
     ptp.plot()
 
     # 2D example
