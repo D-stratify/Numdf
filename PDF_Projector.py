@@ -163,31 +163,41 @@ class FEptp(object):
         """
 
         # From the CDF F obtain the F_i & y_i values as a list [(F_i,y_i),....]
-        F_i  = self.F.dat.data[:]
+        F_i  = self.F.dat.data[:] 
+
+        # They don't coincide with the cell boundaries
+        # Need to convert from Gauss-Legendre points to cell boundary values
+
         mesh = self.F.function_space().mesh()
-        y_i  = mesh.coordinates.dat.data[:] # This needs to be fixed!!
+        y_i  = mesh.coordinates.dat.data[:] 
         print('F_i =',F_i)
         print('y_i =',y_i)
-
+    
         # Sort the p array lexicographically
         indx = np.argsort(F_i)
         p    = F_i[indx]
-        #Q_i  = y_i[indx] # This needs to be fixed
 
-        # Make a 1D mesh where the vertices are given by the sorted p values
-        layers = p[1:] - p[:-1];
-        m_u    = UnitIntervalMesh(ncells=1);
-        mesh   = ExtrudedMesh(mesh=m_u, layers=len(layers), layer_height=layers, extrusion_type='uniform')
-        print(layers)
+        # Make a 1D mesh whose vertices are given by the sorted p values
+        layers   = len(p[1:] - p[:-1]);
+        self.m_p = UnitIntervalMesh(ncells=layers);
+        self.m_p.coordinates.dat.data[:] = p[:]
 
         # Create a function Q(p) on this mesh
-        R         = FiniteElement(family="DG",cell="interval",degree=0)
-        T_element = TensorProductElement(R,self.V_FE)
-        self.V_Q  = FunctionSpace(mesh=mesh ,family=T_element)
+        self.V_Q  = FunctionSpace(mesh=self.m_p,family=self.V_FE)
         self.Q    = Function(self.V_Q)
 
         # Assign Q(p_i) = Q_i
-        #self.Q.dat.data[:] = Q_i; # This needs to be fixed
+        # z = [];
+        # for i,z_i in enumerate(y_i):
+
+        #     if (i == 0) or (i == len(y_i)-1):
+        #         z.append(z_i)
+        #     else:
+        #         for ii in range(4): z.append(z_i)
+
+
+        # Need to convert from cell boundaries to Gauss-Legendre points
+        #self.Q.dat.data[:] = z[:]
         
         return None;
         
@@ -258,16 +268,6 @@ class FEptp(object):
             warning("Cannot plot figure. Error msg: '%s'" % e)
 
         # try:
-        #     Line2D_f = plot(self.F,num_sample_points=50)
-        #     plt.title(r'QDF',fontsize=20)
-        #     plt.ylabel(r'$Q_Y$',fontsize=20)
-        #     plt.xlabel(r'$p$',fontsize=20)
-        #     plt.tight_layout()
-        #     plt.show()
-        # except Exception as e:
-        #     warning("Cannot plot figure. Error msg: '%s'" % e)
-
-        # try:
         #     Line2D_f = plot(self.f,num_sample_points=50)
         #     plt.title(r'PDF',fontsize=20)
         #     plt.ylabel(r'$f_Y$',fontsize=20)
@@ -331,7 +331,7 @@ if __name__ == "__main__":
 
     # 1D example
     x1,y = ptp.domain(Omega_X = {'x1':(0,1)}, Omega_Y = {'Y':(0,1)}, N_elements=4)
-    ptp.fit(function_Y = x1, quadrature_degree=20)
+    ptp.fit(function_Y = x1, quadrature_degree=100)
     ptp.plot()
 
     # 2D example
