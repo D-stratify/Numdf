@@ -5,9 +5,9 @@ Given a user provided "function" over a physical "domain"
 
     Y(X) where X in Ω_X
 
-this class uses the fit method to return the "CDF" & "PDF"
+this class uses the fit method to return the "CDF", "QDF" & "PDF"
 
-    F_Y(y), f_Y(y)
+    F_Y(y), Q_Y(p), f_Y(y)
 
 over their corresponding probability space Ω_Y. The method uses 
 a finite element discretisation consisting of n elements (bins).
@@ -16,8 +16,8 @@ a finite element discretisation consisting of n elements (bins).
 import os
 os.environ["OMP_NUM_THREADS"] = "1"
 from firedrake import *
-parameters["reorder_meshes"] = False
 import numpy as np
+
 
 class FEptp(object):
 
@@ -30,18 +30,21 @@ class FEptp(object):
         # Mesh
         self.m_y  = None
         self.m_yx = None
+        self.m_p  = None
 
         # Finite Elements
-        self.V_FE = FiniteElement(family=func_space_CDF['family'],cell="interval",degree=func_space_CDF['degree'])
-        self.V_fE = FiniteElement(family=func_space_PDF['family'],cell="interval",degree=func_space_PDF['degree'])
+        variant   = "equispaced" #"spectral"
+        self.V_FE = FiniteElement(family=func_space_CDF['family'],cell="interval",degree=func_space_CDF['degree'],variant=variant)
+        self.V_fE = FiniteElement(family=func_space_PDF['family'],cell="interval",degree=func_space_PDF['degree'],variant=variant)
         
         # Function spaces
         self.V_f     = None
         self.V_F     = None
         self.V_F_hat = None
 
-        # CDF,PDF,y
+        # CDF,QDF,PDF,y
         self.F = None
+        self.Q = None
         self.f = None
         self.y = None
 
@@ -85,6 +88,7 @@ class FEptp(object):
         elif self.Xdim == 2:
             print('2D mesh')
             cell_type = "triangle";
+            #cell_type = "quadrilateral"
             mesh_x    = RectangleMesh(nx=1,ny=1,Lx=Omega_X['x1'][1],Ly=Omega_X['x2'][1],originX=Omega_X['x1'][0],originY=Omega_X['x2'][0])
         else:
             raise ValueError('The domain Ω must be 1D or 2D \n')
@@ -146,6 +150,8 @@ class FEptp(object):
         if len(F_hat.dat.data) == len(indx):
             self.F.dat.data[indx] = F_hat.dat.data[:]
         else:
+            #print(len(indx))
+            #print(len(F_hat.dat.data))
             self.F.dat.data[indx] = 0.5*(F_hat.dat.data[:len(indx)] + F_hat.dat.data[len(indx):])
 
         # Check CDF properties
@@ -157,27 +163,31 @@ class FEptp(object):
         return None;
 
     def QDF(self):
-        
         """
         Construct the QDF (inverse CDF) Q_Y(y) of the random function Y(x) by inverting F_Y(y)
         """
 
-        # From the CDF F obtain the F_i & y_i values as a list [(F_i,y_i),....]
+        # From the CDF F obtain the F_i values
         F_i  = self.F.dat.data[:] 
-
-        # They don't coincide with the cell boundaries
-        # Need to convert from Gauss-Legendre points to cell boundary values
-
+    
+        # Grab the Z_i values
+        from firedrake.__future__ import interpolate
+        m_z = self.V_F.mesh()
+        W   = VectorFunctionSpace(m_z, self.V_F.ufl_element())
+        Z   = assemble(interpolate(m_z.coordinates, W)).dat.data
+        
+        # Append bcs to F as by definition a CDF is 0,1 at -/+ infty 
+        p         = np.hstack(( [0]     ,F_i,[1]       ))  
+        
+        # Append bcs to y 
         mesh = self.F.function_space().mesh()
         y_i  = mesh.coordinates.dat.data[:] 
-        print('F_i =',F_i)
-        print('y_i =',y_i)
-    
-        # Sort the p array lexicographically
-        indx = np.argsort(F_i)
-        p    = F_i[indx]
+        z    = np.zeros(2*len(Z))
+        z[0:-1:2] = Z
+        z[1:  :2] = Z
+        z         = np.hstack(( [y_i[0]],z,[y_i[-1]] )) 
 
-        # Make a 1D mesh whose vertices are given by the sorted p values
+        # Make a 1D mesh whose vertices are given by the p values
         layers   = len(p[1:] - p[:-1]);
         self.m_p = UnitIntervalMesh(ncells=layers);
         self.m_p.coordinates.dat.data[:] = p[:]
@@ -187,20 +197,10 @@ class FEptp(object):
         self.Q    = Function(self.V_Q)
 
         # Assign Q(p_i) = Q_i
-        # z = [];
-        # for i,z_i in enumerate(y_i):
+        self.Q.dat.data[:] = z[:]
 
-        #     if (i == 0) or (i == len(y_i)-1):
-        #         z.append(z_i)
-        #     else:
-        #         for ii in range(4): z.append(z_i)
-
-
-        # Need to convert from cell boundaries to Gauss-Legendre points
-        #self.Q.dat.data[:] = z[:]
-        
         return None;
-        
+
     def PDF(self):
 
         """
@@ -251,7 +251,7 @@ class FEptp(object):
     def plot(self):
         
         """
-        Visualise the CDF and PDF using the inbuilt plotting routines
+        Visualise the CDF, QDF and PDF using the inbuilt plotting routines
         """
 
         import matplotlib.pyplot as plt
@@ -263,19 +263,31 @@ class FEptp(object):
             plt.ylabel(r'$F_Y$',fontsize=20)
             plt.xlabel(r'$y$',fontsize=20)
             plt.tight_layout()
+            plt.grid()
             plt.show()
         except Exception as e:
             warning("Cannot plot figure. Error msg: '%s'" % e)
 
-        # try:
-        #     Line2D_f = plot(self.f,num_sample_points=50)
-        #     plt.title(r'PDF',fontsize=20)
-        #     plt.ylabel(r'$f_Y$',fontsize=20)
-        #     plt.xlabel(r'$y$',fontsize=20)
-        #     plt.tight_layout()
-        #     plt.show()
-        # except Exception as e:
-        #     warning("Cannot plot figure. Error msg: '%s'" % e)
+        try:
+            Line2D_F = plot(self.Q,num_sample_points=50)
+            plt.title(r'QDF',fontsize=20)
+            plt.ylabel(r'$Q_Y$',fontsize=20)
+            plt.xlabel(r'$p$',fontsize=20)
+            plt.tight_layout()
+            plt.grid()
+            plt.show()
+        except Exception as e:
+            warning("Cannot plot figure. Error msg: '%s'" % e)
+
+        try:
+            Line2D_f = plot(self.f,num_sample_points=50)
+            plt.title(r'PDF',fontsize=20)
+            plt.ylabel(r'$f_Y$',fontsize=20)
+            plt.xlabel(r'$y$',fontsize=20)
+            plt.tight_layout()
+            plt.show()
+        except Exception as e:
+            warning("Cannot plot figure. Error msg: '%s'" % e)
 
         return None
 
@@ -323,21 +335,21 @@ if __name__ == "__main__":
     
     # %%
     # Specifiy the function spaces for the CDF & PDF
-    ptp = FEptp(func_space_CDF = {"family":"DG","degree":1},func_space_PDF= {"family":"DG","degree":0})
+    ptp = FEptp(func_space_CDF = {"family":"DG","degree":1},func_space_PDF= {"family":"CG","degree":1})
 
     # (a) Specify the domain size(s) and number of finite elements/bins 
     # (b) Projection Y(X) into probability space
     # (c) Plot out the functions
 
     # 1D example
-    x1,y = ptp.domain(Omega_X = {'x1':(0,1)}, Omega_Y = {'Y':(0,1)}, N_elements=4)
-    ptp.fit(function_Y = x1, quadrature_degree=100)
+    x1,y = ptp.domain(Omega_X = {'x1':(0,1)}, Omega_Y = {'Y':(0,1)}, N_elements=50)
+    ptp.fit(function_Y = x1**(3/2), quadrature_degree=1000)
     ptp.plot()
 
-    # 2D example
-    # x1,x2,y = ptp.domain(Omega_X = {'x1':(0,1),'x2':(0,1)}, Omega_Y = {'Y':(0,2)}, N_elements=50)
-    # ptp.fit(function_Y = x1 + x2, quadrature_degree=200)
-    # ptp.plot()
+    #2D example
+    x1,x2,y = ptp.domain(Omega_X = {'x1':(0,1),'x2':(0,1)}, Omega_Y = {'Y':(0,2)}, N_elements=50)
+    ptp.fit(function_Y = x1 + x2, quadrature_degree=500)
+    ptp.plot()
 
-    # # Evaluate the CDF & PDF at points
-    # F_Y,f_Y,y_i  = ptp.evaluate(y = [0., 0.1, 0.2])
+    # Evaluate the CDF & PDF at points
+    F_Y,f_Y,y_i  = ptp.evaluate(y = [0., 0.1, 0.2])
