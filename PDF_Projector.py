@@ -17,7 +17,7 @@ import os
 os.environ["OMP_NUM_THREADS"] = "1"
 from firedrake import *
 import numpy as np
-
+from firedrake.__future__ import interpolate
 
 class FEptp(object):
 
@@ -141,7 +141,6 @@ class FEptp(object):
         # Sort a linear function in ascending order 
         # this creates a DOF map which matches 
         # the extended mesh which are in ascending order
-        from firedrake.__future__ import interpolate
         y,  = SpatialCoordinate(self.m_y)
         ys  = assemble(interpolate(y,self.V_F))
         indx= np.argsort(ys.dat.data)
@@ -171,7 +170,6 @@ class FEptp(object):
         F_i  = self.F.dat.data[:] 
     
         # Grab the Z_i values
-        from firedrake.__future__ import interpolate
         m_z = self.V_F.mesh()
         W   = VectorFunctionSpace(m_z, self.V_F.ufl_element())
         Z   = assemble(interpolate(m_z.coordinates, W)).dat.data
@@ -248,7 +246,7 @@ class FEptp(object):
 
         return None;
 
-    def plot(self):
+    def plot(self,function = 'CDF'):
         
         """
         Visualise the CDF, QDF and PDF using the inbuilt plotting routines
@@ -257,37 +255,42 @@ class FEptp(object):
         import matplotlib.pyplot as plt
         from firedrake.pyplot import plot
 
-        try:
-            Line2D_F = plot(self.F,num_sample_points=50)
-            plt.title(r'CDF',fontsize=20)
-            plt.ylabel(r'$F_Y$',fontsize=20)
-            plt.xlabel(r'$y$',fontsize=20)
-            plt.tight_layout()
-            plt.grid()
-            plt.show()
-        except Exception as e:
-            warning("Cannot plot figure. Error msg: '%s'" % e)
+        if function == 'CDF':
+            try:
+                Line2D_F = plot(self.F,num_sample_points=50)
+                plt.title(r'CDF',fontsize=20)
+                plt.ylabel(r'$F_Y$',fontsize=20)
+                plt.xlabel(r'$y$',fontsize=20)
+                plt.tight_layout()
+                plt.grid()
+                plt.show()
+            except Exception as e:
+                warning("Cannot plot figure. Error msg: '%s'" % e)
+        
+        elif function == 'QDF':
 
-        try:
-            Line2D_F = plot(self.Q,num_sample_points=50)
-            plt.title(r'QDF',fontsize=20)
-            plt.ylabel(r'$Q_Y$',fontsize=20)
-            plt.xlabel(r'$p$',fontsize=20)
-            plt.tight_layout()
-            plt.grid()
-            plt.show()
-        except Exception as e:
-            warning("Cannot plot figure. Error msg: '%s'" % e)
+            try:
+                Line2D_F = plot(self.Q,num_sample_points=50)
+                plt.title(r'QDF',fontsize=20)
+                plt.ylabel(r'$Q_Y$',fontsize=20)
+                plt.xlabel(r'$p$',fontsize=20)
+                plt.tight_layout()
+                plt.grid()
+                plt.show()
+            except Exception as e:
+                warning("Cannot plot figure. Error msg: '%s'" % e)
+        
+        elif function == 'PDF':
 
-        try:
-            Line2D_f = plot(self.f,num_sample_points=50)
-            plt.title(r'PDF',fontsize=20)
-            plt.ylabel(r'$f_Y$',fontsize=20)
-            plt.xlabel(r'$y$',fontsize=20)
-            plt.tight_layout()
-            plt.show()
-        except Exception as e:
-            warning("Cannot plot figure. Error msg: '%s'" % e)
+            try:
+                Line2D_f = plot(self.f,num_sample_points=50)
+                plt.title(r'PDF',fontsize=20)
+                plt.ylabel(r'$f_Y$',fontsize=20)
+                plt.xlabel(r'$y$',fontsize=20)
+                plt.tight_layout()
+                plt.show()
+            except Exception as e:
+                warning("Cannot plot figure. Error msg: '%s'" % e)
 
         return None
 
