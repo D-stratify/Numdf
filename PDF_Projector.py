@@ -163,39 +163,44 @@ class FEptp(object):
 
     def QDF(self):
         """
-        Construct the QDF (inverse CDF) Q_Y(y) of the random function Y(x) by inverting F_Y(y)
+        Construct the QDF (inverse CDF) Q_Y(p) of the random function Y(x) by inverting F_Y(y) = p
         """
 
-        # From the CDF F obtain the F_i values
-        F_i  = self.F.dat.data[:] 
-    
-        # Grab the Z_i values
-        m_z = self.V_F.mesh()
-        W   = VectorFunctionSpace(m_z, self.V_F.ufl_element())
-        Z   = assemble(interpolate(m_z.coordinates, W)).dat.data
-        
-        # Append bcs to F as by definition a CDF is 0,1 at -/+ infty 
-        p         = np.hstack(( [0]     ,F_i,[1]       ))  
-        
-        # Append bcs to y 
-        mesh = self.F.function_space().mesh()
-        y_i  = mesh.coordinates.dat.data[:] 
-        z    = np.zeros(2*len(Z))
-        z[0:-1:2] = Z
-        z[1:  :2] = Z
-        z         = np.hstack(( [y_i[0]],z,[y_i[-1]] )) 
+        # (1) Construct the non-uniform domain Ω_p
+
+        # Obtain dofs F_i = F(z_i) from the CDF
+        F_i = self.F.dat.data[:] 
+
+        # We extend Ω_p to include the endpoints 0,1
+        # As F(y=0) ≠ 0 & F(y=1) ≠ 1 due to numerical error  
+        p   = np.hstack(( [0],F_i,[1] ))  
 
         # Make a 1D mesh whose vertices are given by the p values
         layers   = len(p[1:] - p[:-1]);
         self.m_p = UnitIntervalMesh(ncells=layers);
         self.m_p.coordinates.dat.data[:] = p[:]
 
-        # Create a function Q(p) on this mesh
-        self.V_Q  = FunctionSpace(mesh=self.m_p,family=self.V_FE)
-        self.Q    = Function(self.V_Q)
+        # (2) Create a function Q(p) on this mesh
+        self.V_Q = FunctionSpace(mesh=self.m_p,family=self.V_FE)
+        self.Q   = Function(self.V_Q)
 
-        # Assign Q(p_i) = Q_i
-        self.Q.dat.data[:] = z[:]
+        # (3) Extract the mesh coordinates of the CDF
+        m_y = self.V_F.mesh()
+        W   = VectorFunctionSpace(m_y, self.V_F.ufl_element())
+        y_m = assemble(interpolate(m_y.coordinates, W)).dat.data
+
+        # Double them to convert from mesh coordinates to DOFs
+        y_i         = np.zeros(2*len(y_m))
+        y_i[0:-1:2] = y_m
+        y_i[1:  :2] = y_m
+
+        # Append the coordinates of the boundaries
+        y_l = m_y.coordinates.dat.data[ 0] # left endpoint
+        y_r = m_y.coordinates.dat.data[-1] # right endpoint
+        y_i = np.hstack(( [y_l],y_i,[y_r] )) 
+
+        # Assign Q(F_i) = y_i
+        self.Q.dat.data[:] = y_i[:]
 
         return None;
 
@@ -246,7 +251,7 @@ class FEptp(object):
 
         return None;
 
-    def plot(self,function = 'CDF'):
+    def plot(self,function='CDF'):
         
         """
         Visualise the CDF, QDF and PDF using the inbuilt plotting routines
@@ -291,7 +296,27 @@ class FEptp(object):
                 plt.show()
             except Exception as e:
                 warning("Cannot plot figure. Error msg: '%s'" % e)
+        
+        # else:
+            
+        #     fig, (ax1, ax2) = plt.subplots(1, 2)
 
+        #     Line2D_F = plot(self.F,num_sample_points=50)
+        #     print(Line2D_F)
+        #     ax1.add_line(Line2D_F[0])
+        #     ax1.set_title(r'CDF',fontsize=20)
+        #     ax1.set_ylabel(r'$F_Y$',fontsize=20)
+        #     ax1.set_xlabel(r'$y$',fontsize=20)
+
+        #     Line2D_Q = plot(self.Q,num_sample_points=50)
+        #     ax2.add_line(Line2D_Q[0])
+        #     ax2.set_title(r'QDF',fontsize=20)
+        #     ax2.set_ylabel(r'$Q_Y$',fontsize=20)
+        #     ax2.set_xlabel(r'$p$',fontsize=20)
+            
+        #     plt.tight_layout()
+        #     plt.show()
+            
         return None
 
     def evaluate(self,y):
