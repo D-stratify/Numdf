@@ -246,7 +246,9 @@ class FEptp(object):
         
         # Solve for the CDF, PDF and map back y \in [0,1] |-> Ω_Y 
         self.CDF(quadrature_degree)
+        
         self.QDF()
+        
         self.PDF()
 
         return None;
@@ -358,7 +360,7 @@ class FEptp(object):
         
 if __name__ == "__main__":
 
-    #%%
+    # %%
     print("Initialise")
     
     # %%
@@ -370,9 +372,10 @@ if __name__ == "__main__":
     # (c) Plot out the functions
 
     # 1D example
-    x1,y = ptp.domain(Omega_X = {'x1':(0,1)}, Omega_Y = {'Y':(0,1)}, N_elements=50)
+    x1,y = ptp.domain(Omega_X = {'x1':(0,1)}, Omega_Y = {'Y':(0,1)}, N_elements=10)
     ptp.fit(function_Y = x1**(3/2), quadrature_degree=1000)
-    ptp.plot()
+    ptp.plot(function='CDF')
+    ptp.plot(function='PDF')
 
     #2D example
     x1,x2,y = ptp.domain(Omega_X = {'x1':(0,1),'x2':(0,1)}, Omega_Y = {'Y':(0,2)}, N_elements=50)
@@ -381,3 +384,4 @@ if __name__ == "__main__":
 
     # Evaluate the CDF & PDF at points
     F_Y,f_Y,y_i  = ptp.evaluate(y = [0., 0.1, 0.2])
+# %%

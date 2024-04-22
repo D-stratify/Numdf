@@ -59,3 +59,7 @@ def test_constant():
 
 
 # Convergence tests pass - use sine function
+# def test_sine():
+
+
+#     raise NotImplementedError
