@@ -21,34 +21,59 @@ from firedrake.__future__ import interpolate
 
 class FEptp(object):
 
-    def __init__(self, func_space_CDF = {"family":"DG","degree":1},func_space_PDF= {"family":"CG","degree":1}):
+    def __init__(self, Omega_X = {'x1':(-1,1),'x2':(-1,1)}, Omega_Y = {'Y':(0,1)}, N_elements = 10,func_space_PDF= {"family":"CG","degree":1}):
 
         # Physical space
-        self.Y  = None
-        self.Xdim = None
-        
-        # Mesh
-        self.m_y  = None
-        self.m_yx = None
-        self.m_p  = None
+        self.Ω_X = Omega_X
+        self.Ω_Y = Omega_Y
+        self.N_e = N_elements
+ 
+        # Set Mesh & Coordinates
+        if   len(self.Ω_X) == 1:
+            cell_type = "interval";  
+            self.x1,         self.y  = self.domain(cell_type)
+        elif len(self.Ω_X) == 2:
+            cell_type = "triangle"; #"quadrilateral"
+            self.x1,self.x2, self.y  = self.domain(cell_type)
 
         # Finite Elements
         variant   = "equispaced" #"spectral"
-        self.V_FE = FiniteElement(family=func_space_CDF['family'],cell="interval",degree=func_space_CDF['degree'],variant=variant)
+        self.R    = FiniteElement(family="DG",cell=cell_type ,degree=0,variant=variant)
+        self.V_FE = FiniteElement(family="DG",cell="interval",degree=1,variant=variant)
+        self.V_QE = FiniteElement(family="CG",cell="interval",degree=1,variant=variant)
         self.V_fE = FiniteElement(family=func_space_PDF['family'],cell="interval",degree=func_space_PDF['degree'],variant=variant)
         
-        # Function spaces
-        self.V_f     = None
-        self.V_F     = None
-        self.V_F_hat = None
+        # Function spaces 
+        self.V_F = None
+        self.V_Q = None
+        self.V_f = None
 
-        # CDF,QDF,PDF,y
+        # CDF,QDF,PDF
         self.F = None
         self.Q = None
         self.f = None
-        self.y = None
-
+        
         return None;
+
+    def domain(self,cell_type):
+        
+        """
+        Constructs the extruded mesh Ω_X x Ω_Y given by the physical space Ω_X times the event space Ω_Y        
+        """
+
+        # x-direction
+        if   len(self.Ω_X) == 1:
+            mesh_x = IntervalMesh(ncells=1,length_or_left=self.Ω_X['x1'][0],right=self.Ω_X['x1'][1])
+        elif len(self.Ω_X) == 2:
+            mesh_x = RectangleMesh(nx=1,ny=1,Lx=self.Ω_X['x1'][1],Ly=self.Ω_X['x2'][1],originX=self.Ω_X['x1'][0],originY=self.Ω_X['x2'][0])
+        else:
+            raise ValueError('The domain Ω must be 1D or 2D \n')
+
+        # Add y-direction
+        self.m_y  = IntervalMesh(        ncells=self.N_e,length_or_left=self.Ω_Y['Y'][0],right=self.Ω_Y['Y'][1]) 
+        self.m_yx = ExtrudedMesh(mesh_x, layers=self.N_e,layer_height=1./self.N_e,extrusion_type='uniform')
+        
+        return SpatialCoordinate(self.m_yx)
 
     def indicator(self):
 
@@ -56,61 +81,15 @@ class FEptp(object):
         Defines the indicator function I(y,x=(x1,x2)) which acts on the random function Y(x1,x2)
         """
 
-        if self.Xdim == 1:
+        if len(self.Ω_X) == 1:
             x1,   y = SpatialCoordinate(self.m_yx)
-        elif self.Xdim == 2:
+        elif len(self.Ω_X) == 2:
             x1,x2,y = SpatialCoordinate(self.m_yx)
 
         I  = conditional( self.Y < y, 1.,0.)
 
         return I;
 
-    def domain(self, Omega_X = {'x1':(-1,1),'x2':(-1,1)}, Omega_Y = {'Y':(0,1)}, N_elements = 10):
-        
-        """
-        Constructs the extruded mesh Ω_X x Ω_Y given by the physical space Ω_X times the event space Ω_Y
-
-        Inputs: 
-
-        Omega_X 'dict' - Physical domain 
-        Omega_Y 'dict' - Probability space 
-        N_elements int - Number of finite elements 
-            
-        """
-
-        self.Xdim = len(Omega_X)
-
-        # x-direction
-        if   self.Xdim == 1:
-            print('1D mesh')
-            cell_type = "interval";  
-            mesh_x    = IntervalMesh(ncells=1,length_or_left=Omega_X['x1'][0],right=Omega_X['x1'][1])
-        elif self.Xdim == 2:
-            print('2D mesh')
-            cell_type = "triangle";
-            #cell_type = "quadrilateral"
-            mesh_x    = RectangleMesh(nx=1,ny=1,Lx=Omega_X['x1'][1],Ly=Omega_X['x2'][1],originX=Omega_X['x1'][0],originY=Omega_X['x2'][0])
-        else:
-            raise ValueError('The domain Ω must be 1D or 2D \n')
-
-        R         = FiniteElement(family="DG",cell=cell_type,degree=0)
-        T_element = TensorProductElement(R,self.V_FE)
-
-        # Add y-direction
-        self.m_y  = IntervalMesh(        ncells=N_elements,length_or_left=Omega_Y['Y'][0],right=Omega_Y['Y'][1]) 
-        self.m_yx = ExtrudedMesh(mesh_x, layers=N_elements,layer_height=1./N_elements,extrusion_type='uniform')
-        
-        File("Exruded_Mesh.pvd").write(self.m_yx)
-
-        # Function-spaces
-        self.V_f     = FunctionSpace(mesh=self.m_y ,family=self.V_fE)
-        self.V_F     = FunctionSpace(mesh=self.m_y ,family=self.V_FE)
-        self.V_F_hat = FunctionSpace(mesh=self.m_yx,family=T_element) # extension of V_F into x   
-
-        # Mapping 
-        self.Omega_Y_to_01 = lambda Y:  Y/(Omega_Y['Y'][1]-Omega_Y['Y'][0]) - Omega_Y['Y'][0]/(Omega_Y['Y'][1]-Omega_Y['Y'][0])
-
-        return SpatialCoordinate(self.m_yx)
 
     def CDF(self,quadrature_degree):
 
@@ -122,7 +101,12 @@ class FEptp(object):
         quadrature_degree int - order of the numerical quadrature scheme to use
 
         """
-        
+
+        # Define the Function-space for the CDF      
+        T_element    = TensorProductElement(self.R,self.V_FE)
+        self.V_F     = FunctionSpace(mesh=self.m_y ,family=self.V_FE)
+        self.V_F_hat = FunctionSpace(mesh=self.m_yx,family=T_element) # extension of V_F into x
+
         # Define trial & test functions on V_F_hat
         u = TrialFunction(self.V_F_hat)
         v = TestFunction( self.V_F_hat)
@@ -181,7 +165,7 @@ class FEptp(object):
         self.m_p.coordinates.dat.data[:] = p[:]
 
         # (2) Create a function Q(p) on this mesh
-        self.V_Q = FunctionSpace(mesh=self.m_p,family=self.V_FE)
+        self.V_Q = FunctionSpace(mesh=self.m_p,family=self.V_QE)
         self.Q   = Function(self.V_Q)
 
         # (3) Extract the mesh coordinates of the CDF
@@ -189,15 +173,10 @@ class FEptp(object):
         W   = VectorFunctionSpace(m_y, self.V_F.ufl_element())
         y_m = assemble(interpolate(m_y.coordinates, W)).dat.data
 
-        # Double them to convert from mesh coordinates to DOFs
-        y_i         = np.zeros(2*len(y_m))
-        y_i[0:-1:2] = y_m
-        y_i[1:  :2] = y_m
-
         # Append the coordinates of the boundaries
         y_l = m_y.coordinates.dat.data[ 0] # left endpoint
         y_r = m_y.coordinates.dat.data[-1] # right endpoint
-        y_i = np.hstack(( [y_l],y_i,[y_r] )) 
+        y_i = np.hstack(( [y_l],y_m,[y_r] )) 
 
         # Assign Q(F_i) = y_i
         self.Q.dat.data[:] = y_i[:]
@@ -209,6 +188,9 @@ class FEptp(object):
         """
         Construct the PDF f_Y(y) of the random function Y(x) by projecting f_Y(y) = ∂y F_Y(y)
         """
+
+        # Define the function space V_f       
+        self.V_f  = FunctionSpace(mesh=self.m_y ,family=self.V_fE)
 
         # Define trial & test functions on V_f
         u = TrialFunction(self.V_f)
@@ -241,17 +223,19 @@ class FEptp(object):
             quadrature_degree int - order of the numerical quadrature scheme to use
         """     
 
+        # Mapping 
+        self.Omega_Y_to_01 = lambda Y:  Y/(self.Ω_Y['Y'][1]-self.Ω_Y['Y'][0]) - self.Ω_Y['Y'][0]/(self.Ω_Y['Y'][1]-self.Ω_Y['Y'][0])
+
         # Assign input & map to Y \in Ω_Y |-> [0,1]   
         self.Y = self.Omega_Y_to_01(function_Y) 
         
         # Solve for the CDF, PDF and map back y \in [0,1] |-> Ω_Y 
         self.CDF(quadrature_degree)
-        
         self.QDF()
-        
         self.PDF()
 
         return None;
+
 
     def plot(self,function='CDF'):
         
@@ -364,21 +348,19 @@ if __name__ == "__main__":
     print("Initialise")
     
     # %%
-    # Specifiy the function spaces for the CDF & PDF
-    ptp = FEptp(func_space_CDF = {"family":"DG","degree":1},func_space_PDF= {"family":"CG","degree":1})
-
-    # (a) Specify the domain size(s) and number of finite elements/bins 
+    # (a) Specify the domain size(s) & number of finite elements/bins 
     # (b) Projection Y(X) into probability space
     # (c) Plot out the functions
 
     # 1D example
-    x1,y = ptp.domain(Omega_X = {'x1':(0,1)}, Omega_Y = {'Y':(0,1)}, N_elements=10)
-    ptp.fit(function_Y = x1**(3/2), quadrature_degree=1000)
+    ptp = FEptp(Omega_X = {'x1':(0,1)}, Omega_Y = {'Y':(0,1)}, N_elements=3)
+    x1  = ptp.x1
+    ptp.fit(function_Y = x1, quadrature_degree=10)
     ptp.plot(function='CDF')
-    ptp.plot(function='PDF')
 
     #2D example
-    x1,x2,y = ptp.domain(Omega_X = {'x1':(0,1),'x2':(0,1)}, Omega_Y = {'Y':(0,2)}, N_elements=50)
+    ptp    = FEptp(Omega_X = {'x1':(0,1),'x2':(0,1)}, Omega_Y = {'Y':(0,2)}, N_elements=50)
+    x1,x2  = ptp.x1,ptp.x2
     ptp.fit(function_Y = x1 + x2, quadrature_degree=500)
     ptp.plot()
 
