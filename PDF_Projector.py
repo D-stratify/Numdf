@@ -15,10 +15,11 @@ a finite element discretisation consisting of n elements (bins).
 
 import os
 os.environ["OMP_NUM_THREADS"] = "1"
-from firedrake import *
 import numpy as np
+from firedrake import *
 from firedrake.__future__ import interpolate
 
+# Returns an insance of this object with CDF,PDF,QDF and their domain
 class FEptp(object):
 
     def __init__(self, Omega_X = {'x1':(-1,1),'x2':(-1,1)}, Omega_Y = {'Y':(0,1)}, N_elements = 10,func_space_PDF= {"family":"CG","degree":1}):
@@ -28,13 +29,12 @@ class FEptp(object):
         self.Ω_Y = Omega_Y
         self.N_e = N_elements
  
-        # Set Mesh & Coordinates
+        # Mesh & Coordinates
         if   len(self.Ω_X) == 1:
-            cell_type = "interval";  
-            self.x1,         self.y  = self.domain(cell_type)
+            cell_type = "interval";
         elif len(self.Ω_X) == 2:
             cell_type = "triangle"; #"quadrilateral"
-            self.x1,self.x2, self.y  = self.domain(cell_type)
+        self.coords = self.domain(cell_type)
 
         # Finite Elements
         variant   = "equispaced" #"spectral"
@@ -52,6 +52,7 @@ class FEptp(object):
         self.F = None
         self.Q = None
         self.f = None
+        self.y, = SpatialCoordinate(self.m_y)
         
         return None;
 
@@ -63,15 +64,15 @@ class FEptp(object):
 
         # x-direction
         if   len(self.Ω_X) == 1:
-            mesh_x = IntervalMesh(ncells=1,length_or_left=self.Ω_X['x1'][0],right=self.Ω_X['x1'][1])
+            self.mesh_x = IntervalMesh(ncells=1,length_or_left=self.Ω_X['x1'][0],right=self.Ω_X['x1'][1])
         elif len(self.Ω_X) == 2:
-            mesh_x = RectangleMesh(nx=1,ny=1,Lx=self.Ω_X['x1'][1],Ly=self.Ω_X['x2'][1],originX=self.Ω_X['x1'][0],originY=self.Ω_X['x2'][0])
+            self.mesh_x = RectangleMesh(nx=1,ny=1,Lx=self.Ω_X['x1'][1],Ly=self.Ω_X['x2'][1],originX=self.Ω_X['x1'][0],originY=self.Ω_X['x2'][0])
         else:
             raise ValueError('The domain Ω must be 1D or 2D \n')
 
         # Add y-direction
         self.m_y  = IntervalMesh(        ncells=self.N_e,length_or_left=self.Ω_Y['Y'][0],right=self.Ω_Y['Y'][1]) 
-        self.m_yx = ExtrudedMesh(mesh_x, layers=self.N_e,layer_height=1./self.N_e,extrusion_type='uniform')
+        self.m_yx = ExtrudedMesh(self.mesh_x, layers=self.N_e,layer_height=1./self.N_e,extrusion_type='uniform')
         
         return SpatialCoordinate(self.m_yx)
 
@@ -82,15 +83,13 @@ class FEptp(object):
         """
 
         if len(self.Ω_X) == 1:
-            x1,   y = SpatialCoordinate(self.m_yx)
+            x1,   y = self.coords
         elif len(self.Ω_X) == 2:
-            x1,x2,y = SpatialCoordinate(self.m_yx)
+            x1,x2,y = self.coords
 
-        I  = conditional( self.Y < y, 1.,0.)
+        return conditional( self.Y < y, 1.,0.)
 
-        return I;
-
-
+    
     def CDF(self,quadrature_degree):
 
         """
@@ -103,7 +102,7 @@ class FEptp(object):
         """
 
         # Define the Function-space for the CDF      
-        T_element    = TensorProductElement(self.R,self.V_FE)
+        T_element    = TensorProductElement(self.R ,self.V_FE)
         self.V_F     = FunctionSpace(mesh=self.m_y ,family=self.V_FE)
         self.V_F_hat = FunctionSpace(mesh=self.m_yx,family=T_element) # extension of V_F into x
 
@@ -136,6 +135,9 @@ class FEptp(object):
             #print(len(indx))
             #print(len(F_hat.dat.data))
             self.F.dat.data[indx] = 0.5*(F_hat.dat.data[:len(indx)] + F_hat.dat.data[len(indx):])
+
+        # Apply a slope limiter to F
+        #slope_limiter.vertex_based_limiter.VertexBasedLimiter(self.V_F).apply(self.F)
 
         # Check CDF properties
         Surf_int = assemble(self.F*ds)
@@ -248,7 +250,7 @@ class FEptp(object):
 
         if function == 'CDF':
             try:
-                Line2D_F = plot(self.F,num_sample_points=50)
+                Line2D_F = plot(self.F,num_sample_points=150)
                 plt.title(r'CDF',fontsize=20)
                 plt.ylabel(r'$F_Y$',fontsize=20)
                 plt.xlabel(r'$y$',fontsize=20)
@@ -341,29 +343,71 @@ class FEptp(object):
             + 'N elements \n');
         
         return s
-        
+
+
+    def compose(self,f,g,quadrature_degree=500):
+
+        """
+        Returns the composition of two functions 
+            
+            f o g(y) = f(g(y))
+
+        at the quadrature points y_q of a quadrature mesh. 
+        """
+
+        mesh_g = g.function_space().mesh()
+        mesh_f = f.function_space().mesh()
+
+        V_fgE = FiniteElement(family="Quadrature",cell="interval",degree=quadrature_degree,quad_scheme='default')
+        V_fg  = FunctionSpace(mesh=mesh_g,family=V_fgE)
+        fg    = Function(V_fg)
+
+        m = V_fg.mesh()
+        W = VectorFunctionSpace(m, V_fg.ufl_element())
+        y_vec = assemble(interpolate(m.coordinates, W))
+
+        y_q  = [ [y_i,] for y_i in y_vec.dat.data[:]]
+        vom  = VertexOnlyMesh(mesh_g, y_q)
+        P0DG = FunctionSpace(vom, "DG", 0)
+        g_vec= assemble(interpolate(g, P0DG))
+
+        g_q   = [ [g_i,] for g_i in g_vec.dat.data[:]]
+        vom   = VertexOnlyMesh(mesh_f, g_q)
+        P0DG = FunctionSpace(vom, "DG", 0)
+        f_vec = assemble(interpolate(f, P0DG))
+
+        fg.dat.data[:] = f_vec.dat.data[:]
+
+        return fg
+
+# Takes instances of the FEptp object & performs operations
+
 if __name__ == "__main__":
 
     # %%
     print("Initialise")
     
     # %%
+    #1D example
+
     # (a) Specify the domain size(s) & number of finite elements/bins 
+    ptp   = FEptp(Omega_X = {'x1':(0,1)}, Omega_Y = {'Y':(0,1)}, N_elements=5)
+    
     # (b) Projection Y(X) into probability space
+    x1,_  = ptp.coords
+    ptp.fit(function_Y = x1, quadrature_degree=500)
+
     # (c) Plot out the functions
-
-    # 1D example
-    ptp = FEptp(Omega_X = {'x1':(0,1)}, Omega_Y = {'Y':(0,1)}, N_elements=3)
-    x1  = ptp.x1
-    ptp.fit(function_Y = x1, quadrature_degree=10)
     ptp.plot(function='CDF')
+    ptp.plot(function='PDF')
 
-    #2D example
-    ptp    = FEptp(Omega_X = {'x1':(0,1),'x2':(0,1)}, Omega_Y = {'Y':(0,2)}, N_elements=50)
-    x1,x2  = ptp.x1,ptp.x2
-    ptp.fit(function_Y = x1 + x2, quadrature_degree=500)
-    ptp.plot()
+    # %%
+    # #2D example
+    # ptp    = FEptp(Omega_X = {'x1':(0,1),'x2':(0,1)}, Omega_Y = {'Y':(0,2)}, N_elements=50)
+    # x1,x2,_ = ptp.coords
+    # ptp.fit(function_Y = x1 + x2, quadrature_degree=500)
+    # ptp.plot()
 
-    # Evaluate the CDF & PDF at points
-    F_Y,f_Y,y_i  = ptp.evaluate(y = [0., 0.1, 0.2])
+    # # Evaluate the CDF & PDF at points
+    # F_Y,f_Y,y_i  = ptp.evaluate(y = [0., 0.1, 0.2])
 # %%
