@@ -391,16 +391,98 @@ if __name__ == "__main__":
     #1D example
 
     # (a) Specify the domain size(s) & number of finite elements/bins 
-    ptp   = FEptp(Omega_X = {'x1':(0,1)}, Omega_Y = {'Y':(0,1)}, N_elements=5)
+    ptp   = FEptp(Omega_X = {'x1':(0,1)}, Omega_Y = {'Y':(0,1)}, N_elements=100)
     
     # (b) Projection Y(X) into probability space
     x1,_  = ptp.coords
-    ptp.fit(function_Y = x1, quadrature_degree=500)
+    ptp.fit(function_Y = x1**(4), quadrature_degree=500)
 
     # (c) Plot out the functions
     ptp.plot(function='CDF')
-    ptp.plot(function='PDF')
+    #ptp.plot(function='PDF')
 
+    # %%
+    def jump_condition(a_n_minus,a_n_plus,a_0_minus): 
+        
+        if a_n_plus < a_n_minus: 
+            return a_n_plus-a_n_minus 
+        else:
+            return min(a_n_plus,a_0_minus) - a_n_minus
+
+    def jumps(F,F_0):
+
+        celldata_0 = F_0.dat.data[:].reshape((-1,2))
+
+        celldata_n = F.dat.data[:].reshape((-1,2))
+        Ne         = celldata_n.shape[0]
+        jumps      = np.zeros(Ne)
+
+        for e in range(Ne):
+
+            # (1) cell data
+            if e == 0:
+                cell_n_em1= np.zeros(2)
+                cell_0_em1= np.zeros(2)
+            else:
+                cell_n_em1= celldata_n[e-1,:]
+                cell_0_em1= celldata_0[e-1,:]
+            
+            cell_n_e = celldata_n[e,:] 
+            cell_0_e = celldata_0[e,:]
+
+            if e == Ne-1:
+                cell_n_ep1= np.ones(2)
+            else:
+                cell_n_ep1= celldata_n[e+1,:] 
+            # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+            # (2) jumps 
+            left     = jump_condition(cell_n_em1[1],cell_n_e[0],    cell_0_em1[1])
+            right    = jump_condition(cell_n_e[1],cell_n_ep1[0],    cell_0_e[1])
+            jumps[e] = min(left,right)
+            # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+            # (3) slopes
+
+            
+        return jumps
+
+    def slope_limiter(F):
+
+        import copy
+        F_0 = copy.deepcopy(F)
+        error = 1.
+        iter  = 0.
+        slope =-1. 
+        α = 0.1
+        while (error > 1e-06) or (slope < 0):
+
+            # (1) Update dats
+            Jumps = jumps(F,F_0)
+            F.dat.data[:].reshape((-1,2))[:,0] -= α*Jumps
+            F.dat.data[:].reshape((-1,2))[:,1] += α*Jumps
+
+            slopes = F.dat.data[:].reshape((-1,2))[:,1] - F.dat.data[:].reshape((-1,2))[:,0]
+            slope  = np.min(slopes)
+
+            # (2) Error
+            iter +=1
+            error = np.linalg.norm(Jumps,2)
+            
+            if iter > 10**2:
+                raise ValueError('Relaxation iterations exceeded threshold increase the quadrature degree \n')
+            
+            if iter%10 == 0:
+                print('Iteration i=%d'%iter,' jumps =',Jumps,' slope = ',slope,'\n')
+                ptp.plot(function='CDF')
+
+        F.dat.data[:].reshape((-1,2))[:,0] -= Jumps
+        F.dat.data[:].reshape((-1,2))[:,1] += Jumps
+        ptp.plot(function='CDF')
+
+        return None;
+    
+    slope_limiter(ptp.F)
     # %%
     # #2D example
     # ptp    = FEptp(Omega_X = {'x1':(0,1),'x2':(0,1)}, Omega_Y = {'Y':(0,2)}, N_elements=50)
