@@ -19,7 +19,6 @@ import numpy as np
 from firedrake import *
 from firedrake.__future__ import interpolate
 
-# Returns an insance of this object with CDF,PDF,QDF and their domain
 class FEptp(object):
 
     def __init__(self, Omega_X = {'x1':(-1,1),'x2':(-1,1)}, Omega_Y = {'Y':(0,1)}, N_elements = 10,func_space_PDF= {"family":"CG","degree":1}):
@@ -34,7 +33,7 @@ class FEptp(object):
             cell_type = "interval";
         elif len(self.Ω_X) == 2:
             cell_type = "triangle"; #"quadrilateral"
-        self.coords = self.domain(cell_type)
+        self.coords = self.domain()
 
         # Finite Elements
         variant   = "equispaced" #"spectral"
@@ -56,7 +55,7 @@ class FEptp(object):
         
         return None;
 
-    def domain(self,cell_type):
+    def domain(self):
         
         """
         Constructs the extruded mesh Ω_X x Ω_Y given by the physical space Ω_X times the event space Ω_Y        
@@ -145,7 +144,7 @@ class FEptp(object):
         slope =-1. 
         Jo    = np.zeros(Ne)
         α = 0.1
-        while (error > 0.1) or (slope < 0):
+        while (error > 0.2) or (slope < 0):
 
             # (1) Update dats
             Jn = jumps(self.F,F_0)
@@ -154,15 +153,21 @@ class FEptp(object):
 
             # (2) Error
             iter +=1
-            error = np.linalg.norm(Jn - Jo,2)/np.linalg.norm(Jn,2)
+            if np.linalg.norm(Jn) == 0:
+                error = 0.
+            else:    
+                error = np.linalg.norm(Jn - Jo,2)/np.linalg.norm(Jn,2)
             Jo    = Jn
 
-            if iter > 10**3:
-                raise ValueError('Relaxation iterations exceeded threshold increase the quadrature degree \n')
+            if iter > 10**2:
+                raise ValueError('Slope limiter relaxation iterations exceeded threshold \n')
             
             slopes = self.F.dat.data[:].reshape((-1,2))[:,1] - self.F.dat.data[:].reshape((-1,2))[:,0]
             slope  = np.min(slopes)
+            if abs(slope) < 1e-12:
+                slope = 0.
 
+            #print('Iteration i=%d'%iter,' error = ',error,'slope =',slope,'\n')
             # if iter%10 == 0:
             #     print('Iteration i=%d'%iter,' error = ',error,'slope =',slope,'\n')
             #     ptp.plot(function='CDF')
@@ -221,7 +226,7 @@ class FEptp(object):
             self.F.dat.data[indx] = 0.5*(F_hat.dat.data[:len(indx)] + F_hat.dat.data[len(indx):])
 
         # Apply a slope limiter to F
-        self.slope_limiter()
+        #self.slope_limiter()
 
         # Check CDF properties
         Surf_int = assemble(self.F*ds)
@@ -320,7 +325,7 @@ class FEptp(object):
         self.QDF()
         self.PDF()
 
-        return None;
+        return copy.copy(self)
 
 
     def plot(self,function='CDF'):
@@ -475,15 +480,41 @@ if __name__ == "__main__":
     #1D example
 
     # (a) Specify the domain size(s) & number of finite elements/bins 
-    ptp   = FEptp(Omega_X = {'x1':(0,1)}, Omega_Y = {'Y':(0,1)}, N_elements=70)
-    
-    # (b) Projection Y(X) into probability space
+    ptp   = FEptp(Omega_X = {'x1':(0,1)}, Omega_Y = {'Y':(0,1)}, N_elements=10)
     x1,_  = ptp.coords
-    ptp.fit(function_Y = sin(2*np.pi*x1)**2, quadrature_degree=1000)
 
-    # (c) Plot out the functions
-    ptp.plot(function='CDF')
-    ptp.plot(function='PDF')
+    # (b) Projection Y(X) into probability space    
+    ptp_0 = ptp.fit(function_Y = x1, quadrature_degree=100)
+    ptp_0.plot(function='CDF')
+    print('ptp_0',id(ptp_0),ptp_0.Y)
+
+    ptp_1 = ptp.fit(function_Y = x1**2, quadrature_degree=100)
+    ptp_1.plot(function='CDF')
+    print('ptp_1',id(ptp_1),ptp_1.Y)
+
+    ptp_0.plot(function='CDF')
+    print('ptp_0',id(ptp_0),ptp_0.Y)
+
+
+    # %%
+    #1D example
+
+    # (a) Specify the domain size(s) & number of finite elements/bins 
+    ptp   = FEptp(Omega_X = {'x1':(-1,1)}, Omega_Y = {'Y':(0,2)}, N_elements=10)
+    x1,_  = ptp.coords
+    
+    R         = FiniteElement(family="DG",cell='interval' ,degree=500,variant= "equispaced")
+    T_element = TensorProductElement(ptp.R ,ptp.V_FE)
+    V_F_hat   = FunctionSpace(mesh=ptp.m_yx,family=T_element) # extension of V_F into x
+    
+    # Create a function Y living in an appropriate space
+    Y = Function(V_F_hat)
+    expression = conditional( x1 > 0.5,1,0 ) 
+    Y.interpolate(expression)
+
+    # (b) Projection Y(X) into probability space    
+    ptp_0 = ptp.fit(function_Y = Y, quadrature_degree=100)
+    ptp_0.plot(function='CDF')
 
     # %%
     # #2D example
