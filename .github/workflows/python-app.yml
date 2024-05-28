@@ -16,9 +16,6 @@ jobs:
   build:
     name: "Build CHIST"
     
-    # Job will run on firedrake self-hosted machines
-    runs-on: self-hosted
-
     container:
       image: firedrakeproject/firedrake-vanilla:latest    
     
@@ -27,31 +24,16 @@ jobs:
       # This is an action that checks out your repository onto the runner, 
       # allowing you to run scripts or other actions against your code (such as build and test tools)
       - uses: actions/checkout@v4
-      
-      # Causes the step to always execute, and returns true, even when canceled. 
-      # - name: Cleanup
-      #   if: ${{ always() }}
-      #   run: |
-      #     cd ..
-      #     rm -rf build
-
-      # Installs a version of Python and (by default) adds it to the PATH
-      - name: Setup python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.10' 
 
       # Activate firedrake and install dependencies
       - name: Install CHIST
         run: |
           . /home/firedrake/firedrake/bin/activate
-          python -m pip install -r requirements.txt
           python -m pip install -e .
-          python -m pip install  pytest-cov pytest-timeout pytest-xdist
+          python -m pip install  pytest-timeout
       
       # Run tests with pytest
       - name: CHIST tests
         run: |
           . /home/firedrake/firedrake/bin/activate
-          which firedrake-clean
           python -m pytest
