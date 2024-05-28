@@ -16,6 +16,8 @@ jobs:
   build:
     name: "Build CHIST"
     
+    runs-on: ubuntu-latest
+
     container:
       image: firedrakeproject/firedrake-vanilla:latest    
     
