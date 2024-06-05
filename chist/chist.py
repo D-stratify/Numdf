@@ -19,6 +19,7 @@ import numpy as np
 from firedrake import *
 from firedrake.__future__ import interpolate
 
+
 class FEptp(object):
 
     def __init__(self, Omega_X = {'x1':(-1,1),'x2':(-1,1)}, Omega_Y = {'Y':(0,1)}, N_elements = 10,func_space_PDF= {"family":"CG","degree":1}):
@@ -30,29 +31,26 @@ class FEptp(object):
  
         # Mesh & Coordinates
         if   len(self.Ω_X) == 1:
-            cell_type = "interval";
+            cell_type = "interval"
         elif len(self.Ω_X) == 2:
-            cell_type = "triangle"; #"quadrilateral"
+            cell_type = "quadrilateral"
+
         self.coords = self.domain()
+        self.y,     = SpatialCoordinate(self.m_y)
 
         # Finite Elements
         variant   = "equispaced" #"spectral"
-        self.R    = FiniteElement(family="DG",cell=cell_type ,degree=0,variant=variant)
+        self.R_FE = FiniteElement(family="DG",cell=cell_type ,degree=0,variant=variant)
         self.V_FE = FiniteElement(family="DG",cell="interval",degree=1,variant=variant)
         self.V_QE = FiniteElement(family="CG",cell="interval",degree=1,variant=variant)
         self.V_fE = FiniteElement(family=func_space_PDF['family'],cell="interval",degree=func_space_PDF['degree'],variant=variant)
         
-        # Function spaces 
-        self.V_F = None
-        self.V_Q = None
-        self.V_f = None
+        # Function-space  
+        self.V_F     = FunctionSpace(mesh=self.m_y ,family=self.V_FE)
+        T_element    = TensorProductElement(self.R_FE,self.V_FE)
+        self.V_F_hat = FunctionSpace(mesh=self.m_yx,family=T_element) # extension of V_F into x
+        self.V_f     = FunctionSpace(mesh=self.m_y ,family=self.V_fE)
 
-        # CDF,QDF,PDF
-        self.F = None
-        self.Q = None
-        self.f = None
-        self.y, = SpatialCoordinate(self.m_y)
-        
         return None;
 
     def domain(self):
@@ -65,7 +63,7 @@ class FEptp(object):
         if   len(self.Ω_X) == 1:
             self.mesh_x = IntervalMesh(ncells=1,length_or_left=self.Ω_X['x1'][0],right=self.Ω_X['x1'][1])
         elif len(self.Ω_X) == 2:
-            self.mesh_x = RectangleMesh(nx=1,ny=1,Lx=self.Ω_X['x1'][1],Ly=self.Ω_X['x2'][1],originX=self.Ω_X['x1'][0],originY=self.Ω_X['x2'][0])
+            self.mesh_x = RectangleMesh(nx=1,ny=1,Lx=self.Ω_X['x1'][1],Ly=self.Ω_X['x2'][1],originX=self.Ω_X['x1'][0],originY=self.Ω_X['x2'][0],quadrilateral=True)
         else:
             raise ValueError('The domain Ω must be 1D or 2D \n')
 
@@ -75,16 +73,76 @@ class FEptp(object):
         
         return SpatialCoordinate(self.m_yx)
 
+    def map(self,Y):
+
+        """
+        Mapping of  Y(x) \in Ω_x    to      Y(X) \in [0,1]   
+        """
+
+        return Y/(self.Ω_Y['Y'][1]-self.Ω_Y['Y'][0]) - self.Ω_Y['Y'][0]/(self.Ω_Y['Y'][1]-self.Ω_Y['Y'][0])
+
+    def fit(self,function_Y,quadrature_degree=500):
+
+        """
+        Constructs the CDF F_Y(y) and the PDF f_Y(y) of the function Y(X)
+
+        Inputs:
+
+            function_Y 'ufl expression' - the random function Y(X)
+            quadrature_degree int - order of the numerical quadrature scheme to use
+        """     
+
+        # Map the function to [0,1]
+        Y = self.map(function_Y)
+
+        # Density obejct
+        P = DENSITY(self,Y,quadrature_degree)
+
+        # Generate CDF,QDF,PDF
+        P.fit()
+
+        return P
+    
+    def __str__(self):
+
+        """
+        Print details of the FEptp object
+        """
+        
+        s= ( 'Approximation spaces: \n'
+            + 'CDF F_Y(y) \n'
+            + 'PDF f_Y(y) \n'
+            + 'domain Ω \n'
+            + 'N elements \n');
+        
+        return s
+
+
+class DENSITY(object):
+
+    def __init__(self, ptp,Y,quadrature_degree):
+
+        self.ptp = ptp
+        self.Y   = Y
+        self.quadrature_degree = quadrature_degree
+
+        # CDF,QDF,PDF
+        self.F = None
+        self.Q = None
+        self.f = None
+
+        return None
+
     def indicator(self):
 
         """
         Defines the indicator function I(y,x=(x1,x2)) which acts on the random function Y(x1,x2)
         """
 
-        if len(self.Ω_X) == 1:
-            x1,   y = self.coords
+        if len(self.ptp.Ω_X) == 1:
+            x1,   y = self.ptp.coords
         elif len(self.Ω_X) == 2:
-            x1,x2,y = self.coords
+            x1,x2,y = self.ptp.coords
 
         return conditional( self.Y < y, 1.,0.)
 
@@ -179,7 +237,7 @@ class FEptp(object):
 
         return None
 
-    def CDF(self,quadrature_degree):
+    def cdf(self):
 
         """
         Construct the CDF F_Y(y) of the random function Y(x) by projecting from physical space into the probability space specified.
@@ -190,41 +248,31 @@ class FEptp(object):
 
         """
 
-        # Define the Function-space for the CDF      
-        T_element    = TensorProductElement(self.R ,self.V_FE)
-        self.V_F     = FunctionSpace(mesh=self.m_y ,family=self.V_FE)
-        self.V_F_hat = FunctionSpace(mesh=self.m_yx,family=T_element) # extension of V_F into x
-
         # Define trial & test functions on V_F_hat
-        u = TrialFunction(self.V_F_hat)
-        v = TestFunction( self.V_F_hat)
+        u = TrialFunction(self.ptp.V_F_hat)
+        v = TestFunction( self.ptp.V_F_hat)
 
         # Construct the linear & bilinear forms
         a = inner(u,v) * dx
-        L = inner(self.indicator(),v) * dx(degree=quadrature_degree)
+        L = inner(self.indicator(),v) * dx(degree=self.quadrature_degree)
 
         # Solve for F_hat
-        F_hat = Function(self.V_F_hat)
+        F_hat = Function(self.ptp.V_F_hat)
         solve(a == L,F_hat)  
 
         # Recover F_Y(y) in V_F
-        self.F = Function(self.V_F)
+        self.F = Function(self.ptp.V_F)
 
         # Sort a linear function in ascending order 
         # this creates a DOF map which matches 
         # the extended mesh which are in ascending order
-        y,  = SpatialCoordinate(self.m_y)
-        ys  = assemble(interpolate(y,self.V_F))
+        y,  = SpatialCoordinate(self.ptp.m_y)
+        ys  = assemble(interpolate(y,self.ptp.V_F))
         indx= np.argsort(ys.dat.data)
 
         # Pass F_hat into F
-        if len(F_hat.dat.data) == len(indx):
-            self.F.dat.data[indx] = F_hat.dat.data[:]
-        else:
-            #print(len(indx))
-            #print(len(F_hat.dat.data))
-            self.F.dat.data[indx] = 0.5*(F_hat.dat.data[:len(indx)] + F_hat.dat.data[len(indx):])
-
+        self.F.dat.data[indx] = F_hat.dat.data[:]
+        
         # Apply a slope limiter to F
         #self.slope_limiter()
 
@@ -236,7 +284,42 @@ class FEptp(object):
 
         return None;
 
-    def QDF(self):
+    def compose(self,f,g):
+
+        """
+        Returns the composition of two functions 
+            
+            f o g(y) = f(g(y))
+
+        at the quadrature points y_q of a quadrature mesh. 
+        """
+
+        mesh_g = g.function_space().mesh()
+        mesh_f = f.function_space().mesh()
+
+        V_fgE = FiniteElement(family="Quadrature",cell="interval",degree=self.quadrature_degree,quad_scheme='default')
+        V_fg  = FunctionSpace(mesh=mesh_g,family=V_fgE)
+        fg    = Function(V_fg)
+
+        m = V_fg.mesh()
+        W = VectorFunctionSpace(m, V_fg.ufl_element())
+        y_vec = assemble(interpolate(m.coordinates, W))
+
+        y_q  = [ [y_i,] for y_i in y_vec.dat.data[:]]
+        vom  = VertexOnlyMesh(mesh_g, y_q)
+        P0DG = FunctionSpace(vom, "DG", 0)
+        g_vec= assemble(interpolate(g, P0DG))
+
+        g_q   = [ [g_i,] for g_i in g_vec.dat.data[:]]
+        vom   = VertexOnlyMesh(mesh_f, g_q)
+        P0DG = FunctionSpace(vom, "DG", 0)
+        f_vec = assemble(interpolate(f, P0DG))
+
+        fg.dat.data[:] = f_vec.dat.data[:]
+
+        return fg
+
+    def qdf(self):
         """
         Construct the QDF (inverse CDF) Q_Y(p) of the random function Y(x) by inverting F_Y(y) = p
         """
@@ -256,12 +339,12 @@ class FEptp(object):
         self.m_p.coordinates.dat.data[:] = p[:]
 
         # (2) Create a function Q(p) on this mesh
-        self.V_Q = FunctionSpace(mesh=self.m_p,family=self.V_QE)
+        self.V_Q = FunctionSpace(mesh=self.m_p,family=self.ptp.V_QE)
         self.Q   = Function(self.V_Q)
 
         # (3) Extract the mesh coordinates of the CDF
-        m_y = self.V_F.mesh()
-        W   = VectorFunctionSpace(m_y, self.V_F.ufl_element())
+        m_y = self.ptp.V_F.mesh()
+        W   = VectorFunctionSpace(m_y, self.ptp.V_F.ufl_element())
         y_m = assemble(interpolate(m_y.coordinates, W)).dat.data
 
         # Append the coordinates of the boundaries
@@ -274,25 +357,22 @@ class FEptp(object):
 
         return None;
 
-    def PDF(self):
+    def pdf(self):
 
         """
         Construct the PDF f_Y(y) of the random function Y(x) by projecting f_Y(y) = ∂y F_Y(y)
         """
 
-        # Define the function space V_f       
-        self.V_f  = FunctionSpace(mesh=self.m_y ,family=self.V_fE)
-
         # Define trial & test functions on V_f
-        u = TrialFunction(self.V_f)
-        v = TestFunction(self.V_f)
+        u = TrialFunction(self.ptp.V_f)
+        v = TestFunction(self.ptp.V_f)
 
         # Construct the linear & bilinear forms
         a =  inner(u,v) * dx
         L = -inner(self.F,v.dx(0)) * dx  +  self.F*v*ds(2) - self.F*v*ds(1)
 
         # Solve for f
-        self.f = Function(self.V_f)
+        self.f = Function(self.ptp.V_f)
         solve(a == L, self.f)
 
         # Check PDF properties
@@ -301,32 +381,15 @@ class FEptp(object):
             print("Calculated ∫ f(y) dy should equal 1, but got %e. Check the quadrature_degree used. "%PDF_int)
             #raise ValueError("Calculated ∫ f(y) dy should equal 1, but got %e. Check the quadrature_degree used. "%PDF_int)
 
-        return None;    
+        return None;
 
-    def fit(self,function_Y,quadrature_degree=500):
+    def fit(self):
 
-        """
-        Constructs the CDF F_Y(y) and the PDF f_Y(y) of the function Y(X)
+        self.cdf()
+        self.qdf()
+        self.pdf()
 
-        Inputs:
-
-            function_Y 'ufl expression' - the random function Y(X)
-            quadrature_degree int - order of the numerical quadrature scheme to use
-        """     
-
-        # Mapping 
-        self.Omega_Y_to_01 = lambda Y:  Y/(self.Ω_Y['Y'][1]-self.Ω_Y['Y'][0]) - self.Ω_Y['Y'][0]/(self.Ω_Y['Y'][1]-self.Ω_Y['Y'][0])
-
-        # Assign input & map to Y \in Ω_Y |-> [0,1]   
-        self.Y = self.Omega_Y_to_01(function_Y) 
-        
-        # Solve for the CDF, PDF and map back y \in [0,1] |-> Ω_Y 
-        self.CDF(quadrature_degree)
-        self.QDF()
-        self.PDF()
-
-        return copy.copy(self)
-
+        return None;
 
     def plot(self,function='CDF'):
         
@@ -418,59 +481,9 @@ class FEptp(object):
         y_i = np.asarray(y)
 
         return F_Y,f_Y,y_i;
-    
-    def __str__(self):
 
-        """
-        Print details of the FEptp object
-        """
-        
-        s= ( 'Approximation spaces: \n'
-            + 'CDF F_Y(y) \n'
-            + 'PDF f_Y(y) \n'
-            + 'domain Ω \n'
-            + 'N elements \n');
-        
-        return s
-
-
-    def compose(self,f,g,quadrature_degree=500):
-
-        """
-        Returns the composition of two functions 
-            
-            f o g(y) = f(g(y))
-
-        at the quadrature points y_q of a quadrature mesh. 
-        """
-
-        mesh_g = g.function_space().mesh()
-        mesh_f = f.function_space().mesh()
-
-        V_fgE = FiniteElement(family="Quadrature",cell="interval",degree=quadrature_degree,quad_scheme='default')
-        V_fg  = FunctionSpace(mesh=mesh_g,family=V_fgE)
-        fg    = Function(V_fg)
-
-        m = V_fg.mesh()
-        W = VectorFunctionSpace(m, V_fg.ufl_element())
-        y_vec = assemble(interpolate(m.coordinates, W))
-
-        y_q  = [ [y_i,] for y_i in y_vec.dat.data[:]]
-        vom  = VertexOnlyMesh(mesh_g, y_q)
-        P0DG = FunctionSpace(vom, "DG", 0)
-        g_vec= assemble(interpolate(g, P0DG))
-
-        g_q   = [ [g_i,] for g_i in g_vec.dat.data[:]]
-        vom   = VertexOnlyMesh(mesh_f, g_q)
-        P0DG = FunctionSpace(vom, "DG", 0)
-        f_vec = assemble(interpolate(f, P0DG))
-
-        fg.dat.data[:] = f_vec.dat.data[:]
-
-        return fg
 
 # Takes instances of the FEptp object & performs operations
-
 if __name__ == "__main__":
 
     # %%
@@ -480,49 +493,37 @@ if __name__ == "__main__":
     #1D example
 
     # (a) Specify the domain size(s) & number of finite elements/bins 
-    ptp   = FEptp(Omega_X = {'x1':(0,1)}, Omega_Y = {'Y':(0,1)}, N_elements=10)
+    ptp   = FEptp(Omega_X = {'x1':(0,1)}, Omega_Y = {'Y':(0,1)}, N_elements=5)
     x1,_  = ptp.coords
 
     # (b) Projection Y(X) into probability space    
-    ptp_0 = ptp.fit(function_Y = x1, quadrature_degree=100)
-    ptp_0.plot(function='CDF')
-    print('ptp_0',id(ptp_0),ptp_0.Y)
+    den = ptp.fit(function_Y = x1**1.5, quadrature_degree=100)
+    den.plot('QDF')
 
-    ptp_1 = ptp.fit(function_Y = x1**2, quadrature_degree=100)
-    ptp_1.plot(function='CDF')
-    print('ptp_1',id(ptp_1),ptp_1.Y)
+    # # %%
+    # #1D example of trying to specify a piecewise constant function
 
-    ptp_0.plot(function='CDF')
-    print('ptp_0',id(ptp_0),ptp_0.Y)
-
-
-    # %%
-    #1D example
-
-    # (a) Specify the domain size(s) & number of finite elements/bins 
-    ptp   = FEptp(Omega_X = {'x1':(-1,1)}, Omega_Y = {'Y':(0,2)}, N_elements=10)
-    x1,_  = ptp.coords
+    # # (a) Specify the domain size(s) & number of finite elements/bins 
+    # ptp   = FEptp(Omega_X = {'x1':(0,1)}, Omega_Y = {'Y':(0,1)}, N_elements=10)
+    # x1,_  = ptp.coords
     
-    R         = FiniteElement(family="DG",cell='interval' ,degree=500,variant= "equispaced")
-    T_element = TensorProductElement(ptp.R ,ptp.V_FE)
-    V_F_hat   = FunctionSpace(mesh=ptp.m_yx,family=T_element) # extension of V_F into x
-    
-    # Create a function Y living in an appropriate space
-    Y = Function(V_F_hat)
-    expression = conditional( x1 > 0.5,1,0 ) 
-    Y.interpolate(expression)
+    # https://fenics.readthedocs.io/projects/ufl/en/latest/manual/form_language.html
 
-    # (b) Projection Y(X) into probability space    
-    ptp_0 = ptp.fit(function_Y = Y, quadrature_degree=100)
-    ptp_0.plot(function='CDF')
+    # #expression = conditional( lt(x1,1/3),x1,0) #+ conditional( gt(x1,2/3),x1,0) 
 
-    # %%
+    # expression = conditional( gt(x1,2/3),x1,10) 
+
+    # # (b) Projection Y(X) into probability space    
+    # ptp_0 = ptp.fit(function_Y = expression, quadrature_degree=100)
+    # ptp_0.plot(function='CDF')
+
+    # # %%
     # #2D example
-    # ptp    = FEptp(Omega_X = {'x1':(0,1),'x2':(0,1)}, Omega_Y = {'Y':(0,2)}, N_elements=50)
+    # ptp    = FEptp(Omega_X = {'x1':(0,1),'x2':(0,1)}, Omega_Y = {'Y':(0,2)}, N_elements=5)
     # x1,x2,_ = ptp.coords
     # ptp.fit(function_Y = x1 + x2, quadrature_degree=500)
     # ptp.plot()
 
-    # # Evaluate the CDF & PDF at points
-    # F_Y,f_Y,y_i  = ptp.evaluate(y = [0., 0.1, 0.2])
+    # # # Evaluate the CDF & PDF at points
+    # # F_Y,f_Y,y_i  = ptp.evaluate(y = [0., 0.1, 0.2])
 # %%
