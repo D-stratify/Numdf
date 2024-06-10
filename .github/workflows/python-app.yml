@@ -9,9 +9,6 @@ on:
   pull_request:
     branches: [ "main" ]
 
-permissions:
-  contents: read
-
 jobs:
   build:
     name: "Build CHIST"
@@ -33,7 +30,7 @@ jobs:
         run: |
           . /home/firedrake/firedrake/bin/activate
           python -m pip install -e .
-                
+
       # Run tests with pytest
       - name: CHIST tests
         run: |
