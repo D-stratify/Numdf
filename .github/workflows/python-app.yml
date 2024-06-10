@@ -14,7 +14,8 @@ jobs:
     name: "Build CHIST"
     runs-on: ubuntu-latest
     container:
-      image: firedrakeproject/firedrake-vanilla:latest    
+      image: firedrakeproject/firedrake-vanilla:latest
+      options: --user root
     
     steps:
       
@@ -35,4 +36,4 @@ jobs:
       - name: CHIST tests
         run: |
           . /home/firedrake/firedrake/bin/activate
-          python -m pytest
+          python -m pytest -v tests/
