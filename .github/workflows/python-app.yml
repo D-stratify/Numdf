@@ -15,9 +15,7 @@ permissions:
 jobs:
   build:
     name: "Build CHIST"
-    
     runs-on: ubuntu-latest
-
     container:
       image: firedrakeproject/firedrake-vanilla:latest    
     
@@ -26,14 +24,16 @@ jobs:
       # This is an action that checks out your repository onto the runner, 
       # allowing you to run scripts or other actions against your code (such as build and test tools)
       - uses: actions/checkout@v4
-
+      - name: Setup python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.11
       # Activate firedrake and install dependencies
       - name: Install CHIST
         run: |
           . /home/firedrake/firedrake/bin/activate
           python -m pip install -e .
-          python -m pip install  pytest-timeout
-      
+                
       # Run tests with pytest
       - name: CHIST tests
         run: |
