@@ -64,7 +64,7 @@ class Density(object):
 
         if function == 'CDF':
             try:
-                plot(self.cdf, num_sample_points=150)
+                plot(self.cdf, num_sample_points=50)
                 plt.title(r'CDF', fontsize=20)
                 plt.ylabel(r'$F_Y$', fontsize=20)
                 plt.xlabel(r'$y$', fontsize=20)
@@ -364,7 +364,7 @@ class Ptp(object):
         slope = -1
         jo = np.zeros(ne)
         alpha = 0.1
-        while (error > 0.2) or (slope < 0):
+        while (error > 0.2) or (slope < 0) and (iter <= 10**2):
 
             # (1) Update dats
             jn = jumps(F, F_0)
@@ -380,11 +380,11 @@ class Ptp(object):
             jo = jn
 
             if iter > 10**2:
-                raise ValueError('Slope limiter relaxation iterations exceeded threshold \n')
+                print('Slope limiter relaxation iterations exceeded threshold \n')
            
             slopes = F.dat.data[:].reshape((-1, 2))[:, 1] - F.dat.data[:].reshape((-1, 2))[:, 0]
             slope = np.min(slopes)
-            if abs(slope) < 1e-12:
+            if abs(slope) < 1e-8:
                 slope = 0.
 
             #print('Iteration i=%d'%iter,' error = ',error,'slope =',slope,'\n')
@@ -398,24 +398,3 @@ class Ptp(object):
         F.dat.data[:].reshape((-1, 2))[:, 1] += jn
 
         return F
-
-'''
-if __name__ == "__main__":
-
-# # %%
-# #1D example of trying to specify a piecewise constant function
-
-# # (a) Specify the domain size(s) & number of finite elements/bins 
-# ptp   = FEptp(Omega_X = {'x1':(0,1)}, Omega_Y = {'Y':(0,1)}, N_elements=10)
-# x1,_  = ptp.coords
-
-# https://fenics.readthedocs.io/projects/ufl/en/latest/manual/form_language.html
-
-# #expression = conditional( lt(x1,1/3),x1,0) #+ conditional( gt(x1,2/3),x1,0) 
-
-# expression = conditional( gt(x1,2/3),x1,10) 
-
-# # (b) Projection Y(X) into probability space    
-# ptp_0 = ptp.fit(function_Y = expression, quadrature_degree=100)
-# ptp_0.plot(function='CDF')
-'''
