@@ -1,1 +1,1 @@
-from .chist import chist
+from .chist import Ptp, Density
