@@ -1,1 +1,1 @@
-from .chist import Ptp, Density
+from .chist import Ptp, Density  # noqa F401
