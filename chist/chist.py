@@ -336,8 +336,9 @@ class Ptp(object):
 
         # Check CDF properties
         if abs(assemble(F*ds) - 1) > 1e-02:
-            print("Calculated F(+∞) - F(-∞) should equal 1, got %e. Check the domain of Ω_Y and the quadrature_degree specified." % assemble(F*ds))
-            # raise ValueError("Calculated F(+∞) - F(-∞) should equal 1, got %e. Check the domain of Ω_Y and the quadrature_degree specified."%Surf_int)
+            warning("""Calculated F(+∞) - F(-∞) should equal 1, got %e.
+                     Check the domain of Ω_Y is the range of Y(X) and that the 
+                     quadrature_degree specified is adequate.""" % assemble(F*ds))
 
         return F
 
@@ -415,8 +416,8 @@ class Ptp(object):
 
         # Check PDF properties
         if abs(assemble(f*dx) - 1) > 1e-02:
-            print("Calculated ∫ f(y) dy should equal 1, but got %e. Check the quadrature_degree used. " % assemble(f*dx))
-            # raise ValueError("Calculated ∫ f(y) dy should equal 1, but got %e. Check the quadrature_degree used. "%PDF_int)
+            warning("""Calculated ∫ f(y) dy should equal 1, but got %e.
+                     Check the quadrature_degree used.""" % assemble(f*dx))
 
         return f
 

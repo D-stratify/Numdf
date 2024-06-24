@@ -2,6 +2,7 @@
 
 from firedrake import *
 from chist import Ptp
+import numpy as np
 
 
 def test_initialise():
@@ -15,7 +16,7 @@ def test_initialise():
     assert True
 
 
-def test_cdf_constant():
+def test_constant():
     """Check the CDF of Y(X)=0 is correctly calculated."""
     ptp = Ptp(Omega_X={'x1': (0, 1)}, Omega_Y={'Y': (0, 1)}, n_elements=2)
     x1 = ptp.x_coords()
@@ -24,16 +25,18 @@ def test_cdf_constant():
     assert assemble(((density.cdf-1)**2)*dx) < 1e-8
 
 
-def test_cdf_uniform_domain_length():
-    """Check the CDF of Y(x1)=x1 is y."""
-    ptp = Ptp(Omega_X={'x1': (0, 1)}, Omega_Y={'Y': (0, 1)}, n_elements=10)
+def test_uniform_domain_length():
+    """Check the CDF of Y(x1)=x1 is y and PDF is 1."""
+    ptp = Ptp(Omega_X={'x1': (0, 1)}, Omega_Y={'Y': (0, 1)}, n_elements=5)
     x1 = ptp.x_coords()
 
-    density = ptp.fit(Y=x1, quadrature_degree=500)
+    density = ptp.fit(Y=x1, quadrature_degree=1000)
     assert assemble(((density.cdf-density.y)**2)*dx) < 1e-8
 
+    assert assemble(((density.pdf-1.)**2)*dx) < 1e-8
 
-def test_cdf_nonuniform_domain_length():
+
+def test_nonuniform_domain_length():
     """Check the CDF of Y(x1)=x1 is correctly calculated on shifted domain."""
     ptp = Ptp(Omega_X={'x1': (1, 2)}, Omega_Y={'Y': (1, 2)}, n_elements=10)
     x1 = ptp.x_coords()
@@ -42,14 +45,13 @@ def test_cdf_nonuniform_domain_length():
     assert assemble(((density.cdf-(density.y-1))**2)*dx) < 1e-8
 
 
-def test_cdf_piecewise():
+def test_piecewise():
     """Test the CDF of a piecewise continuous function."""
     ptp = Ptp(Omega_X={'x1': (0, 1)}, Omega_Y={'Y': (0, 1)}, n_elements=50)
     x1 = ptp.x_coords()
 
     expression = conditional(gt(x1, 1/2), x1, x1/2)
-    density = ptp.fit(Y=expression, quadrature_degree=1000)
-    
+    density = ptp.fit(Y=expression, quadrature_degree=1000)   
     y = ptp.y_coord()
     expression = conditional(le(y, 1/4), 2*y, 0) + conditional(And(gt(y, 1/4), le(y, 1/2)), 1/2, 0) + conditional(gt(y, 1/2), y, 0)
     F = Function(ptp.V_F)
@@ -58,13 +60,24 @@ def test_cdf_piecewise():
     assert assemble(((F - density.cdf)**2)*dx) < 1e-6
 
 
-def test_pdf_uniform_domain_length():
-    """Check the pdf of Y(x1)=x1 is 1."""
-    ptp = Ptp(Omega_X={'x1': (0, 1)}, Omega_Y={'Y': (0, 1)}, n_elements=5)
+def test_quadratic():
+    """Check the CDF of Y(x1)=x1^2 is correctly calculated on shifted domain."""
+    ptp = Ptp(Omega_X={'x1': (0, 1)}, Omega_Y={'Y': (0, 1)}, n_elements=50)
     x1 = ptp.x_coords()
-    
-    density = ptp.fit(Y=x1, quadrature_degree=1000)
-    assert assemble(((density.pdf-1.)**2)*dx) < 1e-8
+
+    density = ptp.fit(Y=x1**2, quadrature_degree=500)
+    cdf = density.y**(1/2)
+    assert assemble(((density.cdf-cdf)**2)*dx) < 1e-6
+
+
+def test_cosine():
+    """Check the CDF of Y(x1)=cos(x1)."""
+    ptp = Ptp(Omega_X={'x1': (0, 2*np.pi)}, Omega_Y={'Y': (-1, 1)}, n_elements=100)
+    x1 = ptp.x_coords()
+
+    density = ptp.fit(Y=cos(x1), quadrature_degree=1000)
+    cdf = 1 - acos(density.y)/np.pi
+    assert assemble(((density.cdf-cdf)**2)*dx) < 1e-6
 
 
 def test_qdf_uniform():
@@ -126,17 +139,3 @@ def test_ape_rbc():
     ape_exact = 1./6.
 
     assert abs(ape_numerical - ape_exact)/ape_exact < .01
-
-
-'''
-def test_PDF_sine():
-
-    raise NotImplementedError
-
-def test_APE_Layers():
-    # Arrange
-    # Act
-    APE_numerical = BPE-TPE
-    APE_exact     =   
-    assert abs(APE_numerical - APE_exact) < 1e-08
-'''
