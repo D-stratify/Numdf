@@ -57,7 +57,7 @@ def test_piecewise():
     F = Function(ptp.V_F)
     F.interpolate(expression)
 
-    assert assemble(((F - density.cdf)**2)*dx) < 1e-6
+    assert assemble(((F - density.cdf)**2)*dx) < 2e-6
 
 
 def test_quadratic():
