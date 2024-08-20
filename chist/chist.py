@@ -227,8 +227,10 @@ class Ptp(object):
         # Mesh & Coordinates
         if len(self.Omega_X) == 1:
             self.cell_type = "interval"
+            self.cell_type = "interval"
             mesh_x = IntervalMesh(ncells=1, length_or_left=self.Omega_X['x1'][0], right=self.Omega_X['x1'][1])
         elif len(self.Omega_X) == 2:
+            self.cell_type = "quadrilateral"
             self.cell_type = "quadrilateral"
             mesh_x = RectangleMesh(nx=1, ny=1, Lx=self.Omega_X['x1'][1], Ly=self.Omega_X['x2'][1], originX=self.Omega_X['x1'][0], originY=self.Omega_X['x2'][0], quadrilateral=True)
         else:
@@ -238,6 +240,7 @@ class Ptp(object):
         self.m_yx = ExtrudedMesh(mesh_x, layers=self.n_e, layer_height=1./self.n_e, extrusion_type='uniform')
 
         # Finite-Element
+        self.R_FE = FiniteElement(family="DG", cell=self.cell_type, degree=0, variant="equispaced")
         self.R_FE = FiniteElement(family="DG", cell=self.cell_type, degree=0, variant="equispaced")
         self.V_FE = FiniteElement(family="DG", cell="interval", degree=1, variant="equispaced")
         self.V_QE = FiniteElement(family="CG", cell="interval", degree=1, variant="equispaced")
@@ -461,12 +464,45 @@ class Ptp(object):
 
         return Y
 
+    def _external_function(self, Y_numerical, quadrature_degree):
+        """
+        Return Y_numerical(x_q) at the quadrature points x_q,specified by the quadrature degree.
+
+        Parameters
+        ----------
+        Y_numerical: callable
+            Numerical representation of the function Y(x)
+        quadrature_degree: int
+            Order of the quadrature scheme to use.
+
+        Returns
+        -------
+        Y : firedrake Function
+            Y_numerical evaluated at points x_q of a quadrature mesh.
+        """
+        V_XE = FiniteElement(family="Quadrature", cell=self.cell_type, degree=quadrature_degree, quad_scheme='default')
+        V_YE = FiniteElement(family="DG", cell="interval", degree=0, variant="equispaced")
+        T_element = TensorProductElement(V_XE, V_YE)
+        V_Y = FunctionSpace(mesh=self.m_yx, family=T_element)
+        Y = Function(V_Y)
+
+        m = V_Y.mesh()
+        W = VectorFunctionSpace(m, V_Y.ufl_element())
+        x_vec = assemble(interpolate(m.coordinates, W))
+        x_q = x_vec.dat.data_ro[:, :-1]
+        Y.dat.data[:] = Y_numerical(x_q)
+
+        return Y
+
     def fit(self, Y, quadrature_degree=100):
         """
         Return the Density object correspoding to Y(X).
         
         Parameters
         ----------
+        Y : UFL expression/callable
+            A UFL expression Y(X) terms of x_coords() with range Ω_Y or
+            a callable that returns Y(X_i) at the points {X_i} with range Ω_Y. 
         Y : UFL expression/callable
             A UFL expression Y(X) terms of x_coords() with range Ω_Y or
             a callable that returns Y(X_i) at the points {X_i} with range Ω_Y. 
