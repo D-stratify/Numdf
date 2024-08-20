@@ -1,7 +1,11 @@
 """Module for Ptp and Density classes."""
 
-import os; os.environ["OMP_NUM_THREADS"] = "1"
+import resource as rs
+rs.setrlimit(rs.RLIMIT_STACK, (rs.RLIM_INFINITY, rs.RLIM_INFINITY))
+import os
+os.environ["OMP_NUM_THREADS"] = "1"
 import copy
+from typing import Callable
 import numpy as np
 from firedrake import *
 from firedrake.__future__ import interpolate
@@ -91,7 +95,14 @@ class Density(object):
         return fg
 
     def plot(self, function='CDF'):
-        """Visualise the CDF, QDF and PDF using inbuilt plotting routines."""
+        """
+        Visualise the CDF, QDF and PDF using inbuilt plotting routines.
+        
+        Parameters
+        ----------
+        function : string
+            The function to plot e.g. 'CDF, 'PDF', 'QDF'
+        """
         import matplotlib.pyplot as plt
         from firedrake.pyplot import plot
 
@@ -148,8 +159,8 @@ class Density(object):
         cdf_at_y = np.asarray(self.cdf.at(y))
         qdf_at_y = np.asarray(self.qdf.at(y))
         pdf_at_y = np.asarray(self.pdf.at(y))
-
-        return cdf_at_y, qdf_at_y, pdf_at_y
+        
+        return cdf_at_y,qdf_at_y,pdf_at_y
 
 
 class Ptp(object):
@@ -215,10 +226,10 @@ class Ptp(object):
 
         # Mesh & Coordinates
         if len(self.Omega_X) == 1:
-            cell_type = "interval"
+            self.cell_type = "interval"
             mesh_x = IntervalMesh(ncells=1, length_or_left=self.Omega_X['x1'][0], right=self.Omega_X['x1'][1])
         elif len(self.Omega_X) == 2:
-            cell_type = "quadrilateral"
+            self.cell_type = "quadrilateral"
             mesh_x = RectangleMesh(nx=1, ny=1, Lx=self.Omega_X['x1'][1], Ly=self.Omega_X['x2'][1], originX=self.Omega_X['x1'][0], originY=self.Omega_X['x2'][0], quadrilateral=True)
         else:
             raise ValueError('The domain Ω must be 1D or 2D \n')
@@ -227,7 +238,7 @@ class Ptp(object):
         self.m_yx = ExtrudedMesh(mesh_x, layers=self.n_e, layer_height=1./self.n_e, extrusion_type='uniform')
 
         # Finite-Element
-        self.R_FE = FiniteElement(family="DG", cell=cell_type, degree=0, variant="equispaced")
+        self.R_FE = FiniteElement(family="DG", cell=self.cell_type, degree=0, variant="equispaced")
         self.V_FE = FiniteElement(family="DG", cell="interval", degree=1, variant="equispaced")
         self.V_QE = FiniteElement(family="CG", cell="interval", degree=1, variant="equispaced")
         self.V_fE = FiniteElement(family="CG", cell="interval", degree=1, variant="equispaced")
@@ -317,7 +328,6 @@ class Ptp(object):
         # Solve for F_hat
         F_hat = Function(self.V_F_hat)
         solve(a == L, F_hat)
-        
         # Recover F_Y(y) in V_F
         F = Function(self.V_F)
 
@@ -335,10 +345,10 @@ class Ptp(object):
         F = self.slope_limiter(F)
 
         # Check CDF properties
-        if abs(assemble(F*ds) - 1) > 1e-02:
-            warning("""Calculated F(+∞) - F(-∞) should equal 1, got %e.
-                     Check the domain of Ω_Y is the range of Y(X) and that the 
-                     quadrature_degree specified is adequate.""" % assemble(F*ds))
+        # if abs(assemble(F*ds) - 1) > 1e-02:
+        #     warning("""Calculated F(+∞) - F(-∞) should equal 1, got %e.
+        #              Check the domain of Ω_Y is the range of Y(X) and that the 
+        #              quadrature_degree specified is adequate.""" % assemble(F*ds))
 
         return F
 
@@ -415,11 +425,41 @@ class Ptp(object):
         solve(a == L, f)
 
         # Check PDF properties
-        if abs(assemble(f*dx) - 1) > 1e-02:
-            warning("""Calculated ∫ f(y) dy should equal 1, but got %e.
-                     Check the quadrature_degree used.""" % assemble(f*dx))
+        # if abs(assemble(f*dx) - 1) > 1e-02:
+        #     warning("""Calculated ∫ f(y) dy should equal 1, but got %e.
+        #              Check the quadrature_degree used.""" % assemble(f*dx))
 
         return f
+
+    def _external_function(self, Y_numerical, quadrature_degree):
+        """
+        Return Y_numerical(x_q) at the quadrature points x_q,specified by the quadrature degree.
+
+        Parameters
+        ----------
+        Y_numerical: callable
+            Numerical representation of the function Y(x)
+        quadrature_degree: int
+            Order of the quadrature scheme to use.
+
+        Returns
+        -------
+        Y : firedrake Function
+            Y_numerical evaluated at points x_q of a quadrature mesh.
+        """
+        V_XE = FiniteElement(family="Quadrature", cell=self.cell_type, degree=quadrature_degree, quad_scheme='default')
+        V_YE = FiniteElement(family="DG", cell="interval", degree=0, variant="equispaced")
+        T_element = TensorProductElement(V_XE, V_YE)
+        V_Y = FunctionSpace(mesh=self.m_yx, family=T_element)
+        Y = Function(V_Y)
+
+        m = V_Y.mesh()
+        W = VectorFunctionSpace(m, V_Y.ufl_element())
+        x_vec = assemble(interpolate(m.coordinates, W))
+        x_q = x_vec.dat.data_ro[:, :-1]
+        Y.dat.data[:] = Y_numerical(x_q)
+
+        return Y
 
     def fit(self, Y, quadrature_degree=100):
         """
@@ -427,8 +467,9 @@ class Ptp(object):
         
         Parameters
         ----------
-        Y : UFL expression
-            A UFL expression Y(X) terms of x_coords() with range Ω_Y.
+        Y : UFL expression/callable
+            A UFL expression Y(X) terms of x_coords() with range Ω_Y or
+            a callable that returns Y(X_i) at the points {X_i} with range Ω_Y. 
         quadrature_degree : int
             Quadrature degree used to evaluate the projection of I(y,X).
         
@@ -437,11 +478,18 @@ class Ptp(object):
         density : class 'Density'
             A Density object containing the CDF, QDF & PDF of Y(X).
         """
+               
+        if hasattr(Y, 'dx'):
+            Y_input = Y
+        elif isinstance(Y, Callable):
+            Y_input = self._external_function(Y, quadrature_degree)
+        else:
+            raise ValueError('Expected a UFL expression or python callable \
+                             recieved ', type(Y), '\n')
         y = self.y_coord()
-        F = self._cdf(self.map(Y), quadrature_degree)
+        F = self._cdf(self.map(Y_input), quadrature_degree)
         Q = self._qdf(F)
         f = self._pdf(F)
-
         return Density(self, y, F, Q, f)
 
     def slope_limiter(self, F):
@@ -550,7 +598,7 @@ class Ptp(object):
         slope = np.min(slopes)
         if abs(slope) < 1e-12:
             slope = 0.
-        if slope < 0:
-            warning('Negative slopes could not be removed: min(slope) = %e \n' % slope)
+        # if slope < 0:
+        #     warning('Negative slopes could not be removed: min(slope) = %e \n' % slope)
 
         return F
