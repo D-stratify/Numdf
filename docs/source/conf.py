@@ -7,7 +7,7 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = 'CHIST'
-copyright = '2024, Paul Mannix'
+copyright = '2024, Imperial College London'
 author = 'Paul Mannix'
 release = '2024.9'
 
@@ -26,3 +26,10 @@ exclude_patterns = []
 
 html_theme = 'alabaster'
 html_static_path = ['_static']
+
+extensions = [
+    'sphinx.ext.autodoc',
+    'sphinx.ext.napoleon'
+]
+
+napoleon_include_special_with_doc = True
