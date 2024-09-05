@@ -25,8 +25,8 @@ Analytic functions
 
 In this notebook, we the basic functionality of NumDF including how to compute the
 CDF, PDF and QDF of a one and two dimensional analytical function. A rendered version of this notebook is available `here
-<https://nbviewer.org/github/mannixp/D.stratify-pdfe/blob/main/notebooks/example_notebooks/analytical_functions.ipynb>`__
-and there is a version `on Colab <https://colab.research.google.com/github/mannixp/D.stratify-pdfe/blob/main/notebooks/example_notebooks/analytical_functions.ipynb>`__
+<https://nbviewer.org/github/mannixp/D.stratify-pdfe/blob/main/notebooks/example_notebooks/analytic_functions.ipynb>`__
+and there is a version `on Colab <https://colab.research.google.com/github/mannixp/D.stratify-pdfe/blob/main/notebooks/example_notebooks/analytic_functions.ipynb>`__
 
 
 Available potential energy
