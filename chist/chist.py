@@ -347,6 +347,10 @@ class Ptp(object):
         # Pass F_hat into F
         F.dat.data[indx] = F_hat.dat.data[:]
 
+        # Apply the boundary conditions by extending the endpoints to 0,1
+        F.dat.data[0] = 0
+        F.dat.data[-1] = 1
+
         # Apply a slope limiter to F
         F = self.slope_limiter(F)
 

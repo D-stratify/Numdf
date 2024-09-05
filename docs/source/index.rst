@@ -1,18 +1,33 @@
-.. CHIST documentation master file, created by
-   sphinx-quickstart on Thu Aug 22 09:53:38 2024.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
+NumDF
+*****
 
-CHIST documentation
+NumDF an abbreviation of numerical density function is a finite element based method for constructing the pdf, cdf and qdf 
+(or inverse cdf) of an arbitrary user defined function or simulation output defined on an arbitrary space. Distinct from 
+the tradtional binnning approach to constructing a density our numerical algorithim makes explicit use of the functional form 
+of the expression or simulation field provided.
+
+NumDF is written in python and makes extensive use of the finite element method solver firedrake. 
+
+NumDF documentation
 ===================
-
-Add your content using ``reStructuredText`` syntax. See the
-`reStructuredText <https://www.sphinx-doc.org/en/master/usage/restructuredtext/index.html>`_
-documentation for details.
-
 
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
 
-   chist
+   installation
+   methodology
+   tutorials
+   numdf
+
+
+Links
+=====
+* Code repository: https://github.com/mannixp/D.stratify-pdfe
+* Documentation: 
+
+Developers
+==========
+* `Paul Mannix <https://profiles.imperial.ac.uk/p.mannix15>`_
+* `David Ham <https://profiles.imperial.ac.uk/david.ham>`_
+* `John Craske <https://profiles.imperial.ac.uk/john.craske07>`_

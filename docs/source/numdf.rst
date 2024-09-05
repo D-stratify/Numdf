@@ -1,4 +1,4 @@
-CHIST class documentation
+NumDF class documentation
 =========================
 
 .. autoclass:: chist.Ptp
