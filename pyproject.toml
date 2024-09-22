@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "chist"
+name = "numdf"
 version = "0.1"
 dependencies = ["firedrake", "numpy"]
 

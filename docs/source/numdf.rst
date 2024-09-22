@@ -1,9 +1,9 @@
 NumDF class documentation
 =========================
 
-.. autoclass:: chist.Ptp
+.. autoclass:: numdf.Ptp
     :members:
 
 
-.. autoclass:: chist.Density
+.. autoclass:: numdf.Density
     :members:

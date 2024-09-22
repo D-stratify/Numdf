@@ -1,8 +1,8 @@
 NumDF
 *****
 
-NumDF an abbreviation of numerical density function is a finite element based method for constructing the pdf, cdf and qdf 
-(or inverse cdf) of an arbitrary user defined function or simulation output defined on an arbitrary space. Distinct from 
+NumDF an abbreviation of numerical density function is a finite element based method for constructing the PDF, CDF and QDF 
+(or inverse CDF) of an arbitrary user defined function or simulation output defined on an arbitrary space. Distinct from 
 the tradtional binnning approach to constructing a density our numerical algorithim makes explicit use of the functional form 
 of the expression or simulation field provided.
 

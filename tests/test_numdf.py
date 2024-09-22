@@ -1,7 +1,7 @@
 """Tests for the Ptp."""
 
 from firedrake import *
-from chist import Ptp
+from numdf import Ptp
 import numpy as np
 
 

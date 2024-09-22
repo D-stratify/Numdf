@@ -348,8 +348,8 @@ class Ptp(object):
         F.dat.data[indx] = F_hat.dat.data[:]
 
         # Apply the boundary conditions by extending the endpoints to 0,1
-        F.dat.data[0] = 0
-        F.dat.data[-1] = 1
+        #F.dat.data[0] = 0
+        #F.dat.data[-1] = 1
 
         # Apply a slope limiter to F
         F = self.slope_limiter(F)
@@ -440,36 +440,6 @@ class Ptp(object):
         #              Check the quadrature_degree used.""" % assemble(f*dx))
 
         return f
-
-    def _external_function(self, Y_numerical, quadrature_degree):
-        """
-        Return Y_numerical(x_q) at the quadrature points x_q,specified by the quadrature degree.
-
-        Parameters
-        ----------
-        Y_numerical: callable
-            Numerical representation of the function Y(x)
-        quadrature_degree: int
-            Order of the quadrature scheme to use.
-
-        Returns
-        -------
-        Y : firedrake Function
-            Y_numerical evaluated at points x_q of a quadrature mesh.
-        """
-        V_XE = FiniteElement(family="Quadrature", cell=self.cell_type, degree=quadrature_degree, quad_scheme='default')
-        V_YE = FiniteElement(family="DG", cell="interval", degree=0, variant="equispaced")
-        T_element = TensorProductElement(V_XE, V_YE)
-        V_Y = FunctionSpace(mesh=self.m_yx, family=T_element)
-        Y = Function(V_Y)
-
-        m = V_Y.mesh()
-        W = VectorFunctionSpace(m, V_Y.ufl_element())
-        x_vec = assemble(interpolate(m.coordinates, W))
-        x_q = x_vec.dat.data_ro[:, :-1]
-        Y.dat.data[:] = Y_numerical(x_q)
-
-        return Y
 
     def _external_function(self, Y_numerical, quadrature_degree):
         """

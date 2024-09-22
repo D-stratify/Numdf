@@ -1,10 +1,11 @@
 Tutorials \& Examples
 *********************
 
-The following notebooks provide an overview of the methodology behind 
-how NumDF constructs the CDF, PDF and QDF and computes compositions
-of these objects. To run the notebooks, you will need to `install jupyter
-<https://jupyter.org/install.html>`__ *inside* your activated
+The following notebooks provide an overview of the functionality provided 
+by NumDF including how to compute the CDF, PDF and QDF, how to compute 
+compositions of these objects and how work with external data from numerical 
+simulations. To  run the notebooks, you will need to 
+`install jupyter <https://jupyter.org/install.html>`__ *inside* your activated
 Firedrake virtualenv.
 
 These notebooks are maintained in the NumDF repository, so all the
@@ -19,14 +20,22 @@ Google Colab through your web browser, without installing Firedrake or NumDF.
 We also provide links to non-interactive renderings of the notebooks using
 `Jupyter nbviewer <https://nbviewer.jupyter.org>`__.
 
-
-Analytic functions
-==================
+Example 1 - Analytic functions
+==============================
 
 In this notebook, we the basic functionality of NumDF including how to compute the
 CDF, PDF and QDF of a one and two dimensional analytical function. A rendered version of this notebook is available `here
 <https://nbviewer.org/github/mannixp/D.stratify-pdfe/blob/main/notebooks/example_notebooks/analytic_functions.ipynb>`__
 and there is a version `on Colab <https://colab.research.google.com/github/mannixp/D.stratify-pdfe/blob/main/notebooks/example_notebooks/analytic_functions.ipynb>`__
+
+
+Example 2 - Numerical functions
+===============================
+
+We then consider a more practically relevant example where the function specified is obtained as the output of a direct numerical simulation. 
+Considering a two dimensional Kelvin-Helmholtz instability we present the time evolution of the CDF for which a rendered version of this notebook is available `here
+<https://nbviewer.org/github/mannixp/D.stratify-pdfe/blob/main/notebooks/example_notebooks/numerical_functions.ipynb>`__
+and there is a version `on Colab <https://colab.research.google.com/github/mannixp/D.stratify-pdfe/blob/main/notebooks/example_notebooks/numerical_functions.ipynb>`__
 
 
 Available potential energy
@@ -37,15 +46,6 @@ This example builds on the previous example by requiring the integral of the com
 A rendered version of this notebook is available `here
 <https://nbviewer.org/github/mannixp/D.stratify-pdfe/blob/main/notebooks/example_notebooks/ape_calculation.ipynb>`__
 and there is a version `on Colab <https://colab.research.google.com/github/mannixp/D.stratify-pdfe/blob/main/notebooks/example_notebooks/ape_calculation.ipynb>`__
-
-
-Numerical functions
-===================
-
-We then consider a more practically relevant example where the function specified is obtained as the output of a direct numerical simulation. 
-Considering a two dimensional Kelvin-Helmholtz instability we present the time evolution of the CDF for which a rendered version of this notebook is available `here
-<https://nbviewer.org/github/mannixp/D.stratify-pdfe/blob/main/notebooks/example_notebooks/numerical_functions.ipynb>`__
-and there is a version `on Colab <https://colab.research.google.com/github/mannixp/D.stratify-pdfe/blob/main/notebooks/example_notebooks/numerical_functions.ipynb>`__
 
 
 Numerical Convergence
