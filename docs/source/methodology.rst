@@ -28,31 +28,32 @@ of a function using firedrake. We motivate and describe the choice
 of function spaces used and detail of the slope limiter required
 to gaurantee a monotonic and right increasing CDF. A rendered
 version of this notebook is available `here
-<https://nbviewer.org/github/mannixp/D.stratify-pdfe/blob/main/notebooks/explanatory_notebooks/Part1_CDF_and_PDF_Construction.ipynb>`__
-and there is a version `on Colab <https://colab.research.google.com/github/mannixp/D.stratify-pdfe/blob/main/notebooks/explanatory_notebooks/Part1_CDF_and_PDF_Construction.ipynb>`__
+<https://nbviewer.org/github/mannixp/D.stratify-pdfe/blob/documentation/notebooks/explanatory_notebooks/Part1_CDF_Construction.ipynb>`__
+and there is a version `on Colab <https://colab.research.google.com/github/mannixp/D.stratify-pdfe/blob/documentation/notebooks/explanatory_notebooks/Part1_CDF_Construction.ipynb>`__
+
 
 Part 2 - Constructing the PDF
 =============================
 
 Having constructed a methodology for obtaining the CDF we then discuss 
 how a continuous and weakly differentiable PDF can be recovered from 
-the CDF `here <https://nbviewer.org/github/mannixp/D.stratify-pdfe/blob/main/notebooks/explanatory_notebooks/Part2_QDF_Construction.ipynb>`__.
-You can run this notebook yourself `on Colab <https://colab.research.google.com/github/mannixp/D.stratify-pdfe/blob/main/notebooks/explanatory_notebooks/Part2_QDF_Construction.ipynb>`__
+the CDF `here <https://nbviewer.org/github/mannixp/D.stratify-pdfe/blob/documentation/notebooks/explanatory_notebooks/Part2_PDF_Construction.ipynb>`__.
+You can run this notebook yourself `on Colab <https://colab.research.google.com/github/mannixp/D.stratify-pdfe/blob/documentation/notebooks/explanatory_notebooks/Part2_PDF_Construction.ipynb>`__
 
 
-Part 3 - Constructing the inverse CDF or QDF
+Part 3 - Constructing the inverse CDF
 ===================================
 
 Next, we discuss how to compute the inverse CDF also known 
-as the QDF or quantile density function `here <https://nbviewer.org/github/mannixp/D.stratify-pdfe/blob/main/notebooks/explanatory_notebooks/Part2_QDF_Construction.ipynb>`__.
-You can run this notebook yourself `on Colab <https://colab.research.google.com/github/mannixp/D.stratify-pdfe/blob/main/notebooks/explanatory_notebooks/Part2_QDF_Construction.ipynb>`__
+as the QDF or quantile density function `here <https://nbviewer.org/github/mannixp/D.stratify-pdfe/blob/documentation/notebooks/explanatory_notebooks/Part3_QDF_Construction.ipynb>`__.
+You can run this notebook yourself `on Colab <https://colab.research.google.com/github/mannixp/D.stratify-pdfe/blob/documentation/notebooks/explanatory_notebooks/Part3_QDF_Construction.ipynb>`__
 
 
 Part 4 - Composing density objects
 =========================
 
 Finally we discuss how integrals of compositions of the CDF and PDF can be evaluated
-`here <https://nbviewer.org/github/mannixp/D.stratify-pdfe/blob/main/notebooks/explanatory_notebooks/Part3_APE_Calculation.ipynb>`__.
+`here <https://nbviewer.org/github/mannixp/D.stratify-pdfe/blob/documentation/notebooks/explanatory_notebooks/Part4_Composing_Functions.ipynb>`__.
 You can run this notebook yourself `on Colab
-<https://colab.research.google.com/github/mannixp/D.stratify-pdfe/blob/main/notebooks/explanatory_notebooks/Part3_APE_Calculation.ipynb>`__
+<https://colab.research.google.com/github/mannixp/D.stratify-pdfe/blob/documentation/notebooks/explanatory_notebooks/Part4_Composing_Functions.ipynb>`__
 
