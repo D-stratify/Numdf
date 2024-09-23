@@ -140,6 +140,7 @@ class Density(object):
                 plt.ylabel(r'$f_Y$', fontsize=20)
                 plt.xlabel(r'$y$', fontsize=20)
                 plt.tight_layout()
+                plt.grid()
                 plt.show()
             except Exception as e:
                 warning("Cannot plot figure. Error msg: '%s'" % e)
