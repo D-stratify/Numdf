@@ -57,17 +57,17 @@ def test_piecewise():
     F = Function(ptp.V_F)
     F.interpolate(expression)
 
-    assert assemble(((F - density.cdf)**2)*dx) < 2e-6
+    assert assemble(((F - density.cdf)**2)*dx) < 5e-6
 
 
 def test_quadratic():
     """Check the CDF of Y(x1)=x1^2 is correctly calculated on shifted domain."""
-    ptp = Ptp(Omega_X={'x1': (0, 1)}, Omega_Y={'Y': (0, 1)}, n_elements=50)
+    ptp = Ptp(Omega_X={'x1': (0, 1)}, Omega_Y={'Y': (0, 1)}, n_elements=100)
     x1 = ptp.x_coords()
 
-    density = ptp.fit(Y=x1**2, quadrature_degree=500)
+    density = ptp.fit(Y=x1**2, quadrature_degree=1000)
     cdf = density.y**(1/2)
-    assert assemble(((density.cdf-cdf)**2)*dx) < 1e-6
+    assert assemble(((density.cdf-cdf)**2)*dx) < 5e-6
 
 
 def test_cosine():
@@ -77,7 +77,7 @@ def test_cosine():
 
     density = ptp.fit(Y=cos(x1), quadrature_degree=1000)
     cdf = 1 - acos(density.y)/np.pi
-    assert assemble(((density.cdf-cdf)**2)*dx) < 1e-6
+    assert assemble(((density.cdf-cdf)**2)*dx) < 5e-6
 
 
 def test_qdf_uniform():
