@@ -1,4 +1,4 @@
-NumDF class documentation
+Class documentation
 =========================
 
 .. autoclass:: numdf.Ptp
