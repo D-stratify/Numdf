@@ -24,11 +24,10 @@ Part 1 - Constructing the CDF
 =============================
 
 In this notebook, we describe how NumDF approximates the CDF 
-of a function using firedrake. We motivate and describe the choice
-of function spaces used and detail of the slope limiter required
-to gaurantee a monotonic and right increasing CDF. A rendered
-version of this notebook is available `here
-<https://nbviewer.org/github/mannixp/D.stratify-pdfe/blob/main/notebooks/explanatory_notebooks/Part1_CDF_Construction.ipynb>`__
+of a function using Firedrake. We motivate and describe the choice
+of function spaces used as well as detailing the slope limiter applied 
+to the CDF in order to guarantee a monotonic and right increasing CDF. 
+A rendered version of this notebook is available `here <https://nbviewer.org/github/mannixp/D.stratify-pdfe/blob/main/notebooks/explanatory_notebooks/Part1_CDF_Construction.ipynb>`__
 and there is a version `on Colab <https://colab.research.google.com/github/mannixp/D.stratify-pdfe/blob/main/notebooks/explanatory_notebooks/Part1_CDF_Construction.ipynb>`__
 
 

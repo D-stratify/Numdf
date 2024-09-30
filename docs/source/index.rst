@@ -1,12 +1,11 @@
 NumDF
 *****
 
-NumDF an abbreviation of numerical density function is a finite element based method for constructing the PDF, CDF and QDF 
-(or inverse CDF) of an arbitrary user defined function or simulation output defined on an arbitrary space. Distinct from 
-the tradtional binnning approach to constructing a density our numerical algorithim makes explicit use of the functional form 
+NumDF is a finite element based method for constructing the PDF, CDF and inverse CDF of a user defined function or simulation output. 
+Distinct from the traditional binning approach to constructing a density our numerical algorithm makes explicit use of the functional form 
 of the expression or simulation field provided.
 
-NumDF is written in python and makes extensive use of the finite element method solver firedrake. 
+NumDF is written in python and makes extensive use of the finite element method solver `Firedrake <https://www.Firedrakeproject.org>`_. 
 
 NumDF documentation
 ===================

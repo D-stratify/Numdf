@@ -6,7 +6,7 @@
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-project = 'CHIST'
+project = 'NumDF'
 copyright = '2024, Imperial College London'
 author = 'Paul Mannix'
 release = '2024.9'

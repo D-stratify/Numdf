@@ -348,18 +348,19 @@ class Ptp(object):
         # Pass F_hat into F
         F.dat.data[indx] = F_hat.dat.data[:]
 
-        # Apply the boundary conditions by extending the endpoints to 0,1
-        #F.dat.data[0] = 0
-        #F.dat.data[-1] = 1
+        # If the CDF is constant i.e F(y) = const do nothing otherwise
+        # apply the boundary conditions by extending the endpoints to 0,1
+        if np.allclose(F.dat.data[:], F.dat.data[0]) is False:
+            F.dat.data[0] = 0  # left end point
+            F.dat.data[-1] = 1  # right end point
 
         # Apply a slope limiter to F
         F = self.slope_limiter(F)
 
-        # Check CDF properties
-        # if abs(assemble(F*ds) - 1) > 1e-02:
-        #     warning("""Calculated F(+∞) - F(-∞) should equal 1, got %e.
-        #              Check the domain of Ω_Y is the range of Y(X) and that the 
-        #              quadrature_degree specified is adequate.""" % assemble(F*ds))
+        # Re-enforce
+        if np.allclose(F.dat.data[:], F.dat.data[0]) is False:
+            F.dat.data[0] = 0  # left end point
+            F.dat.data[-1] = 1  # right end point
 
         return F
 
@@ -573,7 +574,7 @@ class Ptp(object):
         slope = -1
         jo = np.zeros(ne)
         alpha = 0.1
-        while (error > 0.01 or slope < 0) and (iter < 10**2):
+        while (error > 0.01 or slope < 0) and (iter < 10**3):
 
             # (1) Update dats
             jn = jumps(F, F_0)
@@ -594,7 +595,7 @@ class Ptp(object):
             if abs(slope) < 1e-12:
                 slope = 0.
 
-            # if iter % 5 == 0:
+            # if iter % 100 == 0:
             #     print('Iteration i=%d' % iter, ' error = ', error, 'slope =', slope, '\n')
             #     import matplotlib.pyplot as plt
             #     from firedrake.pyplot import plot
@@ -612,7 +613,9 @@ class Ptp(object):
         slope = np.min(slopes)
         if abs(slope) < 1e-12:
             slope = 0.
-        # if slope < 0:
-        #     warning('Negative slopes could not be removed: min(slope) = %e \n' % slope)
-
+        if slope < 0:
+            #warning('Negative slopes could not be removed: min(slope) = %e \n' % slope)
+            from firedrake.slope_limiter import vertex_based_limiter
+            Limiter = vertex_based_limiter.VertexBasedLimiter(space=self.V_F)
+            Limiter.apply(field=F)
         return F
