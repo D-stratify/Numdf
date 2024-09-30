@@ -43,8 +43,7 @@ Example 3 - Available potential energy
 
 Next, we discuss how to compute the available potential energy for a simple two dimensional field and compare our methods
 estimate with an analytical calculation. This example builds on the previous example by requiring the integral of the composition 
-of two CDFs to be evaluated. A rendered version of this notebook is available `here
-<https://nbviewer.org/github/mannixp/D.stratify-pdfe/blob/main/notebooks/example_notebooks/Example_3_ape_calculation.ipynb>`__
+of two CDFs to be evaluated. A rendered version of this notebook is available `here <https://nbviewer.org/github/mannixp/D.stratify-pdfe/blob/main/notebooks/example_notebooks/Example_3_ape_calculation.ipynb>`__
 and there is a version `on Colab <https://colab.research.google.com/github/mannixp/D.stratify-pdfe/blob/main/notebooks/example_notebooks/Example_3_ape_calculation.ipynb>`__
 
 
