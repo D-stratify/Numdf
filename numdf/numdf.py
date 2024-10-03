@@ -330,7 +330,7 @@ class Ptp(object):
 
         # Construct the linear & bilinear forms
         a = inner(u, v) * dx
-        L = inner(self.indicator(Y), v) * dx(degree=quadrature_degree)
+        L = inner(self.indicator(Y), v) * dx(degree=quadrature_degree, scheme="default", domain=self.m_yx)
 
         # Solve for F_hat
         F_hat = Function(self.V_F_hat)
@@ -465,7 +465,7 @@ class Ptp(object):
         Y : firedrake Function
             Y_numerical evaluated at points x_q of a quadrature mesh.
         """
-        V_XE = FiniteElement(family="Quadrature", cell=self.cell_type, degree=quadrature_degree, quad_scheme='default')
+        V_XE = FiniteElement(family="Quadrature", cell=self.cell_type, degree=quadrature_degree, quad_scheme="default")
         V_YE = FiniteElement(family="DG", cell="interval", degree=0, variant="equispaced")
         T_element = TensorProductElement(V_XE, V_YE)
         V_Y = FunctionSpace(mesh=self.m_yx, family=T_element)
@@ -474,7 +474,7 @@ class Ptp(object):
         m = V_Y.mesh()
         W = VectorFunctionSpace(m, V_Y.ufl_element())
         x_vec = assemble(interpolate(m.coordinates, W))
-        x_q = x_vec.dat.data_ro[:, :-1]
+        x_q = x_vec.dat.data[:, :-1]
         Y.dat.data[:] = Y_numerical(x_q)
 
         return Y
