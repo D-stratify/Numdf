@@ -10,7 +10,7 @@ NumDF is written in python and makes extensive use of the finite element method 
 **Links**
 =========
 * Code repository: https://github.com/mannixp/D.stratify-pdfe
-* Documentation: 
+* Documentation: https://mannixp.github.io/D.stratify-pdfe/
 
 **Developers**
 ==============
