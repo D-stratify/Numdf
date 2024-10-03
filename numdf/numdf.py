@@ -430,7 +430,13 @@ class Ptp(object):
 
         # Construct the linear & bilinear forms
         a = inner(u, v) * dx
-        L = -inner(F, v.dx(0)) * dx + F*v*ds(2) - F*v*ds(1)
+        #L = -inner(F, v.dx(0)) * dx + F*v*ds(2) - F*v*ds(1)
+
+        L_cell = -inner(F,v.dx(0)) * dx
+        L_int = (F('+')*v('+') - F('-')*v('-'))*dS
+        L_ext = F*v*ds(2) - F*v*ds(1) 
+
+        L = L_cell + L_int + L_ext
 
         # Solve for f
         f = Function(self.V_f)
