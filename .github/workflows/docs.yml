@@ -55,7 +55,7 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           name: github-pages
-          path: /__w/numdf/numdf/docs/build/html
+          path: /__w/D.stratify-pdfe/D.stratify-pdfe/docs/build/html
           retention-days: 1
   
   
