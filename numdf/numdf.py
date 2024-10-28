@@ -60,7 +60,8 @@ class Density(object):
 
     def compose(self, f, g, quadrature_degree):
         """
-        Return the function composition f o g(y) = f(g(y)).
+        Return the projection of the function composition 
+        f o g(y) = f(g(y)) into the space of test functions.
 
         Parameters
         ----------
@@ -70,7 +71,7 @@ class Density(object):
         Returns
         -------
         f(g(y)) : firedrake Function
-            Composition evaluated at points y_q of a quadrature mesh.
+            Composition projected into the space CG1
         """
         mesh_g = g.function_space().mesh()
         mesh_f = f.function_space().mesh()
@@ -95,7 +96,25 @@ class Density(object):
 
         fg.dat.data[:] = f_vec.dat.data[:]
 
-        return fg
+        # Grab the mesh of the function composition
+        mesh_fg = fg.function_space().mesh()
+        
+        # Define the space of test functions
+        V_test = FunctionSpace(mesh=mesh_fg, family='CG', degree=1)
+
+        # Create Trial and Test functions
+        u = TrialFunction(V_test)
+        v = TestFunction(V_test)
+
+        # Define the bilinear and linear forms
+        a = inner(u, v)*dx
+        L = inner(fg, v)*dx(degree=quadrature_degree)
+
+        # Solve
+        fg_test = Function(V_test)
+        solve(a == L, fg_test)
+        
+        return fg_test
 
     def plot(self, function='CDF'):
         """
@@ -135,7 +154,20 @@ class Density(object):
         elif function == 'PDF':
 
             try:
-                plot(self.pdf, num_sample_points=50)
+                # Plot within the elements
+                plot(self.pdf["_tilde"], num_sample_points=50)
+                
+                # Plot the Dirac measures
+                m_y = self.pdf["mu"].function_space().mesh()
+                loc = m_y.coordinates.dat.data[:]
+                jump = self.pdf["my"].dat.data[:]
+
+                y = np.linspace(0, 1, 50)
+                for j_i, y_i in zip(jump, loc):
+                    plt.plot(y_i*np.ones(50), j_i*y, 'b--')
+                    if abs(j_i) > 1e-03:
+                        plt.plot(y_i, j_i, 'ro')
+                
                 plt.title(r'PDF', fontsize=20)
                 plt.ylabel(r'$f_Y$', fontsize=20)
                 plt.xlabel(r'$y$', fontsize=20)
@@ -160,11 +192,33 @@ class Density(object):
         cdf_at_y,qdf_at_y,pdf_at_y : array-like
             cdf,qdf,pdf evaluated on y.
         """
+        
         cdf_at_y = np.asarray(self.cdf.at(y))
         qdf_at_y = np.asarray(self.qdf.at(y))
-        pdf_at_y = np.asarray(self.pdf.at(y))
-        
-        return cdf_at_y,qdf_at_y,pdf_at_y
+        pdf_at_y = np.asarray(self.pdf["f_tilde"].at(y))
+
+        return cdf_at_y, qdf_at_y, pdf_at_y
+
+    def distribution(self, g):
+        """
+        Given a test function g(y) evaluates the distribution
+        int g(y) f_Y(y) dy
+
+        Parameters
+        ----------
+        g : Firedrake function or UFL expression
+            A valid test function
+
+        Returns
+        -------
+        integral : float
+            The integral int g(y) f_Y(y) dy
+        """
+
+        f_tilde = self.pdf["f_tilde"]
+        mu = self.pdf["mu"]
+     
+        return assemble(g*f_tilde*dx + g*mu*ds + g*mu*dS )
 
 
 class Ptp(object):
@@ -248,12 +302,15 @@ class Ptp(object):
         self.R_FE = FiniteElement(family="DG", cell=self.cell_type, degree=0, variant="equispaced")
         self.V_FE = FiniteElement(family="DG", cell="interval", degree=1, variant="equispaced")
         self.V_QE = FiniteElement(family="CG", cell="interval", degree=1, variant="equispaced")
-        self.V_fE = FiniteElement(family="CG", cell="interval", degree=1, variant="equispaced")
+        self.V_fE = FiniteElement(family="DG", cell="interval", degree=0, variant="equispaced")
+        self.V_muE = FiniteElement(family="CG", cell="interval", degree=1, variant="equispaced")
+
         # Function-space
         self.V_F = FunctionSpace(mesh=self.m_y, family=self.V_FE)
         T_element = TensorProductElement(self.R_FE, self.V_FE)
         self.V_F_hat = FunctionSpace(mesh=self.m_yx, family=T_element)
-        self.V_f = FunctionSpace(mesh=self.m_y, family=self.V_fE)
+        self.V_f_tilde = FunctionSpace(mesh=self.m_y, family=self.V_fE)
+        self.V_mu = FunctionSpace(mesh=self.m_y, family=self.V_muE)
 
     def y_coord(self):
         """Return the y coordinate on the interval mesh."""
@@ -412,7 +469,10 @@ class Ptp(object):
 
     def _pdf(self, F):
         """
-        Return the PDF f(y) of Y(x) by projecting f(y) = ∂/∂y F(y).
+        Return the PDF f(y) of Y(x) in terms of the density f_tilde(y)
+        the derivative of F(y) within each element and the measure mu(y)
+        which corresponds to the distributional derivative of F(y) at the
+        element facets.
         
         Parameters
         ----------
@@ -421,33 +481,39 @@ class Ptp(object):
         
         Returns
         -------
-        f : firedrake Function
-            The pdf f(y) of the random function Y(X).
+        f : dict of firedrake Functions
+            The the PDF f(y) of the random function Y(X) as a distribution
+            in terms of the density f_tilde(y) within the elements and the
+            measure mu(y) at the jump discontinuity between elements.
         """
+        
         # Define trial & test functions on V_f
-        u = TrialFunction(self.V_f)
-        v = TestFunction(self.V_f)
+        u = TrialFunction(self.V_f_tilde)
+        v = TestFunction(self.V_f_tilde)
 
         # Construct the linear & bilinear forms
-        a = inner(u, v) * dx
-        #L = -inner(F, v.dx(0)) * dx + F*v*ds(2) - F*v*ds(1)
+        a = inner(u, v)*dx
+        L = inner(F.dx(0), v)*dx
+        
+        # Solve for the PDF f
+        f_tilde = Function(self.V_f_tilde)
+        solve(a == L, f_tilde)
 
-        L_cell = -inner(F,v.dx(0)) * dx
-        L_int = (F('+')*v('+') - F('-')*v('-'))*dS
-        L_ext = F*v*ds(2) - F*v*ds(1) 
+        # Define trial & test functions on V_dirac
+        u = TrialFunction(self.V_mu)
+        v = TestFunction(self.V_mu)
 
-        L = L_cell + L_int + L_ext
+        # Define the variational form
+        a = inner(avg(u), avg(v))*dS + inner(u, v)*ds  # avg(v) = (v(+) + v(-))/2
+        L_internal = -(F('+')*v('+') - F('-')*v('-')) * dS
+        L_external = -((F-1)*v*ds(2) - (F-0)*v*ds(1))  # The jump at the end-points 
+        L = L_internal + L_external
+       
+        # Solve for the PDF f
+        mu = Function(self.V_mu)
+        solve(a == L, mu)
 
-        # Solve for f
-        f = Function(self.V_f)
-        solve(a == L, f)
-
-        # Check PDF properties
-        # if abs(assemble(f*dx) - 1) > 1e-02:
-        #     warning("""Calculated ∫ f(y) dy should equal 1, but got %e.
-        #              Check the quadrature_degree used.""" % assemble(f*dx))
-
-        return f
+        return {"f_tilde": f_tilde, "mu": mu}
 
     def _external_function(self, Y_numerical, quadrature_degree):
         """
@@ -478,40 +544,6 @@ class Ptp(object):
         Y.dat.data[:] = Y_numerical(x_q)
 
         return Y
-
-    def fit(self, Y, quadrature_degree=100):
-        """
-        Return the Density object correspoding to Y(X).
-        
-        Parameters
-        ----------
-        Y : UFL expression/callable
-            A UFL expression Y(X) terms of x_coords() with range Ω_Y or
-            a callable that returns Y(X_i) at the points {X_i} with range Ω_Y. 
-        Y : UFL expression/callable
-            A UFL expression Y(X) terms of x_coords() with range Ω_Y or
-            a callable that returns Y(X_i) at the points {X_i} with range Ω_Y. 
-        quadrature_degree : int
-            Quadrature degree used to evaluate the projection of I(y,X).
-        
-        Returns
-        -------
-        density : class 'Density'
-            A Density object containing the CDF, QDF & PDF of Y(X).
-        """
-               
-        if hasattr(Y, 'dx'):
-            Y_input = Y
-        elif isinstance(Y, Callable):
-            Y_input = self._external_function(Y, quadrature_degree)
-        else:
-            raise ValueError('Expected a UFL expression or python callable \
-                             recieved ', type(Y), '\n')
-        y = self.y_coord()
-        F = self._cdf(self.map(Y_input), quadrature_degree)
-        Q = self._qdf(F)
-        f = self._pdf(F)
-        return Density(self, y, F, Q, f)
 
     def slope_limiter(self, F):
         """
@@ -619,9 +651,45 @@ class Ptp(object):
         slope = np.min(slopes)
         if abs(slope) < 1e-12:
             slope = 0.
+
         if slope < 0:
             #warning('Negative slopes could not be removed: min(slope) = %e \n' % slope)
             from firedrake.slope_limiter import vertex_based_limiter
             Limiter = vertex_based_limiter.VertexBasedLimiter(space=self.V_F)
             Limiter.apply(field=F)
+            
         return F
+
+    def fit(self, Y, quadrature_degree=100):
+        """
+        Return the Density object correspoding to Y(X).
+        
+        Parameters
+        ----------
+        Y : UFL expression/callable
+            A UFL expression Y(X) terms of x_coords() with range Ω_Y or
+            a callable that returns Y(X_i) at the points {X_i} with range Ω_Y. 
+        Y : UFL expression/callable
+            A UFL expression Y(X) terms of x_coords() with range Ω_Y or
+            a callable that returns Y(X_i) at the points {X_i} with range Ω_Y. 
+        quadrature_degree : int
+            Quadrature degree used to evaluate the projection of I(y,X).
+        
+        Returns
+        -------
+        density : class 'Density'
+            A Density object containing the CDF, QDF & PDF of Y(X).
+        """
+               
+        if hasattr(Y, 'dx'):
+            Y_input = Y
+        elif isinstance(Y, Callable):
+            Y_input = self._external_function(Y, quadrature_degree)
+        else:
+            raise ValueError('Expected a UFL expression or python callable \
+                             recieved ', type(Y), '\n')
+        y = self.y_coord()
+        F = self._cdf(self.map(Y_input), quadrature_degree)
+        Q = self._qdf(F)
+        f = self._pdf(F)
+        return Density(self, y, F, Q, f)
