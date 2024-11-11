@@ -21,7 +21,7 @@ class Density(object):
     Instances of this class are returned by the Ptp class when the
     fit method is called on a function Y(X) to return
 
-    F(y), Q(p), f(y)
+    F(y), Q(p), f(φ)
 
     the "CDF", "QDF" & "PDF" over their corresponding probability space Ω_Y.
     This class allows these functions to be easily composed and plotted.
@@ -61,7 +61,8 @@ class Density(object):
     def compose(self, f, g, quadrature_degree):
         """
         Return the projection of the function composition 
-        f o g(y) = f(g(y)) into the space of test functions.
+        f o g(y) = f(g(y)) 
+        into the space of test functions.
 
         Parameters
         ----------
@@ -71,7 +72,7 @@ class Density(object):
         Returns
         -------
         f(g(y)) : firedrake Function
-            Composition projected into the space CG1
+            Composition projected into the space DG1
         """
         mesh_g = g.function_space().mesh()
         mesh_f = f.function_space().mesh()
@@ -100,7 +101,7 @@ class Density(object):
         mesh_fg = fg.function_space().mesh()
         
         # Define the space of test functions
-        V_test = FunctionSpace(mesh=mesh_fg, family='CG', degree=1)
+        V_test = FunctionSpace(mesh=mesh_fg, family='DG', degree=1)
 
         # Create Trial and Test functions
         u = TrialFunction(V_test)
@@ -155,12 +156,12 @@ class Density(object):
 
             try:
                 # Plot within the elements
-                plot(self.pdf["_tilde"], num_sample_points=50)
+                plot(self.pdf["fc"], num_sample_points=50)
                 
                 # Plot the Dirac measures
-                m_y = self.pdf["mu"].function_space().mesh()
+                m_y = self.pdf["fs"].function_space().mesh()
                 loc = m_y.coordinates.dat.data[:]
-                jump = self.pdf["my"].dat.data[:]
+                jump = self.pdf["fs"].dat.data[:]
 
                 y = np.linspace(0, 1, 50)
                 for j_i, y_i in zip(jump, loc):
@@ -195,14 +196,21 @@ class Density(object):
         
         cdf_at_y = np.asarray(self.cdf.at(y))
         qdf_at_y = np.asarray(self.qdf.at(y))
-        pdf_at_y = np.asarray(self.pdf["f_tilde"].at(y))
+        pdf_at_y = np.asarray(self.pdf["fc"].at(y))
 
         return cdf_at_y, qdf_at_y, pdf_at_y
 
-    def distribution(self, g):
+    def __call__(self, g):
         """
-        Given a test function g(y) evaluates the distribution
-        int g(y) f_Y(y) dy
+        Given a test function g(y) evaluate
+            
+            int g(y) dF(y)
+        
+        in terms of its
+                
+            int g(y) dF(y) := <g,f_c> + <g,f_s> 
+        
+        where f_c & f_s are the Riesz representors of f(φ).
 
         Parameters
         ----------
@@ -212,13 +220,12 @@ class Density(object):
         Returns
         -------
         integral : float
-            The integral int g(y) f_Y(y) dy
+            The integral int g(y) dF(y)
         """
 
-        f_tilde = self.pdf["f_tilde"]
-        mu = self.pdf["mu"]
-     
-        return assemble(g*f_tilde*dx + g*mu*ds + g*mu*dS )
+        fc = self.pdf["fc"]
+        fs = self.pdf["fs"]
+        return assemble(g*fc*dx) + assemble(avg(g)*fs*dS + g*fs*ds)
 
 
 class Ptp(object):
@@ -302,15 +309,15 @@ class Ptp(object):
         self.R_FE = FiniteElement(family="DG", cell=self.cell_type, degree=0, variant="equispaced")
         self.V_FE = FiniteElement(family="DG", cell="interval", degree=1, variant="equispaced")
         self.V_QE = FiniteElement(family="CG", cell="interval", degree=1, variant="equispaced")
-        self.V_fE = FiniteElement(family="DG", cell="interval", degree=0, variant="equispaced")
-        self.V_muE = FiniteElement(family="CG", cell="interval", degree=1, variant="equispaced")
+        self.V_fc = FiniteElement(family="DG", cell="interval", degree=0, variant="equispaced")
+        self.V_fs = FiniteElement(family="CG", cell="interval", degree=1, variant="equispaced")
 
         # Function-space
         self.V_F = FunctionSpace(mesh=self.m_y, family=self.V_FE)
         T_element = TensorProductElement(self.R_FE, self.V_FE)
         self.V_F_hat = FunctionSpace(mesh=self.m_yx, family=T_element)
-        self.V_f_tilde = FunctionSpace(mesh=self.m_y, family=self.V_fE)
-        self.V_mu = FunctionSpace(mesh=self.m_y, family=self.V_muE)
+        self.V_fc = FunctionSpace(mesh=self.m_y, family=self.V_fc)
+        self.V_fs = FunctionSpace(mesh=self.m_y, family=self.V_fs)
 
     def y_coord(self):
         """Return the y coordinate on the interval mesh."""
@@ -469,10 +476,8 @@ class Ptp(object):
 
     def _pdf(self, F):
         """
-        Return the PDF f(y) of Y(x) in terms of the density f_tilde(y)
-        the derivative of F(y) within each element and the measure mu(y)
-        which corresponds to the distributional derivative of F(y) at the
-        element facets.
+        Return the PDF f(φ) of Y(x) in terms of its Riesz representor
+        within each element fc(y) and at the element facets fs(y).
         
         Parameters
         ----------
@@ -482,26 +487,25 @@ class Ptp(object):
         Returns
         -------
         f : dict of firedrake Functions
-            The the PDF f(y) of the random function Y(X) as a distribution
-            in terms of the density f_tilde(y) within the elements and the
-            measure mu(y) at the jump discontinuity between elements.
+            The distribution f(φ) of the random function Y(X) as a distribution
+            in terms of fs(y) within the elements and fs(y) at element facets.
         """
         
-        # Define trial & test functions on V_f
-        u = TrialFunction(self.V_f_tilde)
-        v = TestFunction(self.V_f_tilde)
+        # Define trial & test functions on V_fc
+        u = TrialFunction(self.V_fc)
+        v = TestFunction(self.V_fc)
 
         # Construct the linear & bilinear forms
         a = inner(u, v)*dx
         L = inner(F.dx(0), v)*dx
         
-        # Solve for the PDF f
-        f_tilde = Function(self.V_f_tilde)
-        solve(a == L, f_tilde)
+        # Solve for fc
+        fc = Function(self.V_fc)
+        solve(a == L, fc)
 
         # Define trial & test functions on V_dirac
-        u = TrialFunction(self.V_mu)
-        v = TestFunction(self.V_mu)
+        u = TrialFunction(self.V_fs)
+        v = TestFunction(self.V_fs)
 
         # Define the variational form
         a = inner(avg(u), avg(v))*dS + inner(u, v)*ds  # avg(v) = (v(+) + v(-))/2
@@ -509,11 +513,11 @@ class Ptp(object):
         L_external = -((F-1)*v*ds(2) - (F-0)*v*ds(1))  # The jump at the end-points 
         L = L_internal + L_external
        
-        # Solve for the PDF f
-        mu = Function(self.V_mu)
-        solve(a == L, mu)
+        # Solve for fs
+        fs = Function(self.V_fs)
+        solve(a == L, fs)
 
-        return {"f_tilde": f_tilde, "mu": mu}
+        return {"fc": fc, "fs": fs}
 
     def _external_function(self, Y_numerical, quadrature_degree):
         """

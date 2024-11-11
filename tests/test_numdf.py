@@ -30,7 +30,7 @@ def test_pdf_constant():
     ptp = Ptp(Omega_X={'x1': (0, 1)}, Omega_Y={'Y': (0, 1)}, n_elements=2)
     x1 = ptp.x_coords()
     density = ptp.fit(Y=0*x1)
-    integral = density.distribution(1)
+    integral = density(1)
 
     assert abs(integral - 1) < 1e-12
 
@@ -50,8 +50,8 @@ def test_pdf_uniform_domain_length():
     x1 = ptp.x_coords()
 
     density = ptp.fit(Y=x1, quadrature_degree=1000)
-    f_tilde = density.pdf['f_tilde']
-    assert assemble(abs(f_tilde-1)*dx) < 1e-8
+    fc = density.pdf['fc']
+    assert assemble(abs(fc-1)*dx) < 1e-8
 
 
 def test_cdf_nonuniform_domain_length():
@@ -69,8 +69,8 @@ def test_pdf_nonuniform_domain_length():
     x1 = ptp.x_coords()
 
     density = ptp.fit(Y=x1, quadrature_degree=1000)
-    f_tilde = density.pdf["f_tilde"]
-    assert assemble(abs(f_tilde-1)*dx) < 1e-8
+    fc = density.pdf["fc"]
+    assert assemble(abs(fc-1)*dx) < 1e-8
 
 
 def test_cdf_piecewise():
@@ -104,7 +104,7 @@ def test_pdf_piecewise():
     f = Function(V_f)
     f.interpolate(expression)
 
-    assert assemble(abs(density.pdf['f_tilde'] - f)*dx ) < 1e-03
+    assert assemble(abs(density.pdf['fc'] - f)*dx ) < 1e-03
 
 
 def test_cdf_quadratic():
@@ -124,7 +124,7 @@ def test_pdf_quadratic():
 
     density = ptp.fit(Y=x1**2, quadrature_degree=1000)
     y = density.y
-    int_num = density.distribution(y)
+    int_num = density(y)
 
     # Analytic density
     #f = .5/y**(1/2) - Compare the mean due to singularity
@@ -154,7 +154,7 @@ def test_pdf_cosine():
     # Analytical
     f = 1/(np.pi*(1-y**2)**.5)
 
-    assert assemble((density.pdf['f_tilde'] - f)*dx ) < 1e-03
+    assert assemble((density.pdf['fc'] - f)*dx ) < 1e-03
 
 
 def test_qdf_uniform():
@@ -210,7 +210,7 @@ def test_ape_rbc():
     Z_ref = p_B.compose(p_Z.qdf, p_B.cdf, quadrature_degree=100)
     b = p_B.y
 
-    bpe = p_B.distribution(b*Z_ref)
+    bpe = p_B(b*Z_ref)
     tpe = (1/2)*assemble(x2*(1-x2)*dx)
 
     ape_numerical = bpe-tpe
@@ -241,7 +241,7 @@ def test_ape_layered():
 
     # Act
     z = density_Z.y
-    bpe_num = density_Z.distribution(beta_star*z)
+    bpe_num = density_Z(beta_star*z)
 
     ape_numerical = bpe_num - 3/8
     ape_exact = 0.
