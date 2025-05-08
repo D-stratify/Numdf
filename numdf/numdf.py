@@ -133,7 +133,7 @@ class Density(object):
             try:
                 plot(self.cdf, num_sample_points=50)
                 plt.title(r'CDF', fontsize=20)
-                plt.ylabel(r'$F_Y$', fontsize=20)
+                plt.ylabel(r'$\mathsf{F}_Y(y)$', fontsize=20)
                 plt.xlabel(r'$y$', fontsize=20)
                 plt.tight_layout()
                 plt.grid()
@@ -144,9 +144,9 @@ class Density(object):
 
             try:
                 plot(self.qdf, num_sample_points=50)
-                plt.title(r'QDF', fontsize=20)
-                plt.ylabel(r'$Q_Y$', fontsize=20)
-                plt.xlabel(r'$p$', fontsize=20)
+                plt.title(r'Inverse CDF', fontsize=20)
+                plt.ylabel(r'$\mathsf{F}^{-1}_Y(t)$', fontsize=20)
+                plt.xlabel(r'$t$', fontsize=20)
                 plt.tight_layout()
                 plt.grid()
                 plt.show()
@@ -170,7 +170,7 @@ class Density(object):
                         plt.plot(y_i, j_i, 'ro')
                 
                 plt.title(r'PDF', fontsize=20)
-                plt.ylabel(r'$f_Y$', fontsize=20)
+                plt.ylabel(r'$\mathsf{f}_0, \mathsf{f}_1$', fontsize=20)
                 plt.xlabel(r'$y$', fontsize=20)
                 plt.tight_layout()
                 plt.grid()

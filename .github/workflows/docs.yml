@@ -42,12 +42,10 @@ jobs:
       # Activate firedrake and install dependencies
       - name: Install NumDF
         run: |
-          . /home/firedrake/firedrake/bin/activate
-          python -m pip install -e .
+          python3 -m pip install -e .
 
       - name: Build docs
         run: |
-          . /home/firedrake/firedrake/bin/activate
           cd docs
           make html
       
