@@ -27,7 +27,7 @@ jobs:
     name: Run doc build
     runs-on: ubuntu-latest
     container:
-      image: firedrakeproject/firedrake-docdeps:latest
+      image: firedrakeproject/firedrake:latest
       options: --user root
     
     # Steps represent a sequence of tasks that will be executed as
