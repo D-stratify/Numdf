@@ -21,17 +21,14 @@ jobs:
       
       # This is an action that checks out your repository onto the runner, 
       # allowing you to run scripts or other actions against your code (such as build and test tools)
-      - uses: actions/checkout@v4
-      - name: Setup python
-        uses: actions/setup-python@v4
-        with:
-          python-version: 3.11
-      
+      - name: Checkout
+        uses: actions/checkout@v4
+    
       # Activate firedrake and install dependencies
       - name: Install NumDF
         run: |
           python3 -m pip install -e .
-
+      
       # Run tests with pytest
       - name: NumDF tests
         run: |
