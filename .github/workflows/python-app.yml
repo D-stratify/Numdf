@@ -35,4 +35,5 @@ jobs:
       # Run tests with pytest
       - name: NumDF tests
         run: |
+          python3 -m pip install pytest
           python3 -m pytest -v tests/

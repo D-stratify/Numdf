@@ -145,8 +145,8 @@ class Density(object):
             try:
                 plot(self.qdf, num_sample_points=50)
                 plt.title(r'Inverse CDF', fontsize=20)
-                plt.ylabel(r'$\mathsf{F}^{-1}_Y(t)$', fontsize=20)
-                plt.xlabel(r'$t$', fontsize=20)
+                plt.ylabel(r'$\mathsf{F}^{-1}_Y(p)$', fontsize=20)
+                plt.xlabel(r'$p$', fontsize=20)
                 plt.tight_layout()
                 plt.grid()
                 plt.show()
@@ -156,12 +156,12 @@ class Density(object):
 
             try:
                 # Plot within the elements
-                plot(self.pdf["fc"], num_sample_points=50)
+                plot(self.pdf["f0"], num_sample_points=50)
                 
                 # Plot the Dirac measures
-                m_y = self.pdf["fs"].function_space().mesh()
+                m_y = self.pdf["f1"].function_space().mesh()
                 loc = m_y.coordinates.dat.data[:]
-                jump = self.pdf["fs"].dat.data[:]
+                jump = self.pdf["f1"].dat.data[:]
 
                 y = np.linspace(0, 1, 50)
                 for j_i, y_i in zip(jump, loc):
@@ -196,7 +196,7 @@ class Density(object):
         
         cdf_at_y = np.asarray(self.cdf.at(y))
         qdf_at_y = np.asarray(self.qdf.at(y))
-        pdf_at_y = np.asarray(self.pdf["fc"].at(y))
+        pdf_at_y = np.asarray(self.pdf["f0"].at(y))
 
         return cdf_at_y, qdf_at_y, pdf_at_y
 
@@ -208,9 +208,9 @@ class Density(object):
         
         in terms of its
                 
-            int g(y) dF(y) := <g,f_c> + <g,f_s> 
+            int g(y) dF(y) := <g,f_0> + <g,f_1> 
         
-        where f_c & f_s are the Riesz representors of f(φ).
+        where f_0 & f_1 are the Riesz representors of f[v].
 
         Parameters
         ----------
@@ -223,9 +223,9 @@ class Density(object):
             The integral int g(y) dF(y)
         """
 
-        fc = self.pdf["fc"]
-        fs = self.pdf["fs"]
-        return assemble(g*fc*dx) + assemble(avg(g)*fs*dS + g*fs*ds)
+        f0 = self.pdf["f0"]
+        f1 = self.pdf["f1"]
+        return assemble(g*f0*dx) + assemble(avg(g)*f1*dS + g*f1*ds)
 
 
 class Ptp(object):
@@ -248,7 +248,7 @@ class Ptp(object):
     Omega_X : dictionary
         Physical domain of the function Y(X).
     Omega_Y : dictionary
-        Range of the function Y(X).
+        Domain of the function F_Y(y).
     n_elements : int
         Number of finite elements.
 
@@ -266,7 +266,7 @@ class Ptp(object):
     
     Compute the density of a function on this domain::
         
-        >>> density = ptp.fit(Y=x1, quadrature_degree=100)
+        >>> density = ptp.fit(Y=x1, Range_Y={'Y_min':0, 'Y_max':1}, quadrature_degree=100)
         >>> density.plot('CDF')
   
     """
@@ -280,7 +280,7 @@ class Ptp(object):
         Omega_X : dictionary
             Physical domain of the function Y(X).
         Omega_Y : dictionary
-            Range of the function Y(X).
+            Domain of the function F_Y(y).
         n_elements : int
             Number of finite elements.
         """
@@ -309,15 +309,15 @@ class Ptp(object):
         self.R_FE = FiniteElement(family="DG", cell=self.cell_type, degree=0, variant="equispaced")
         self.V_FE = FiniteElement(family="DG", cell="interval", degree=1, variant="equispaced")
         self.V_QE = FiniteElement(family="CG", cell="interval", degree=1, variant="equispaced")
-        self.V_fc = FiniteElement(family="DG", cell="interval", degree=0, variant="equispaced")
-        self.V_fs = FiniteElement(family="CG", cell="interval", degree=1, variant="equispaced")
+        self.V_f0 = FiniteElement(family="DG", cell="interval", degree=0, variant="equispaced")
+        self.V_f1 = FiniteElement(family="CG", cell="interval", degree=1, variant="equispaced")
 
         # Function-space
         self.V_F = FunctionSpace(mesh=self.m_y, family=self.V_FE)
         T_element = TensorProductElement(self.R_FE, self.V_FE)
         self.V_F_hat = FunctionSpace(mesh=self.m_yx, family=T_element)
-        self.V_fc = FunctionSpace(mesh=self.m_y, family=self.V_fc)
-        self.V_fs = FunctionSpace(mesh=self.m_y, family=self.V_fs)
+        self.V_f0 = FunctionSpace(mesh=self.m_y, family=self.V_f0)
+        self.V_f1 = FunctionSpace(mesh=self.m_y, family=self.V_f1)
 
     def y_coord(self):
         """Return the y coordinate on the interval mesh."""
@@ -343,7 +343,7 @@ class Ptp(object):
         Parameters
         ----------
         Y : UFL expression
-            A UFL expression Y(X) terms of x_coords() with range Ω_Y.
+            A UFL expression Y(X) terms of x_coords().
         
         Returns
         -------
@@ -372,7 +372,7 @@ class Ptp(object):
             _, _, y = self.xy_coords()
         return conditional(Y < y, 1, 0)
 
-    def _cdf(self, Y, quadrature_degree):
+    def _cdf(self, Y, Range_Y, quadrature_degree):
         """
         Return the cdf F(y) of the random function Y(X).
         
@@ -412,19 +412,19 @@ class Ptp(object):
         # Pass F_hat into F
         F.dat.data[indx] = F_hat.dat.data[:]
 
-        # If the CDF is constant i.e F(y) = const do nothing otherwise
-        # apply the boundary conditions by extending the endpoints to 0,1
-        if np.allclose(F.dat.data[:], F.dat.data[0]) is False:
-            F.dat.data[0] = 0  # left end point
-            F.dat.data[-1] = 1  # right end point
+        # # If the CDF is constant i.e F(y) = const do nothing otherwise
+        # # apply the boundary conditions by extending the endpoints to 0,1
+        # if np.allclose(F.dat.data[:], F.dat.data[0]) is False:
+        #     F.dat.data[0] = 0  # left end point
+        #     F.dat.data[-1] = 1  # right end point
 
         # Apply a slope limiter to F
-        F = self.slope_limiter(F)
+        F = self.slope_limiter(F, Range_Y)
 
-        # Re-enforce
-        if np.allclose(F.dat.data[:], F.dat.data[0]) is False:
-            F.dat.data[0] = 0  # left end point
-            F.dat.data[-1] = 1  # right end point
+        # # Re-enforce
+        # if np.allclose(F.dat.data[:], F.dat.data[0]) is False:
+        #     F.dat.data[0] = 0  # left end point
+        #     F.dat.data[-1] = 1  # right end point
 
         return F
 
@@ -474,50 +474,72 @@ class Ptp(object):
 
         return Q
 
-    def _pdf(self, F):
+    def _pdf(self, F, Range_Y):
         """
-        Return the PDF f(φ) of Y(x) in terms of its Riesz representor
-        within each element fc(y) and at the element facets fs(y).
+        Return the PDF f[φ] of Y(x) in terms of its Riesz representor
+        within each element f0(y) and at the element facets f1(y).
         
         Parameters
         ----------
         F : firedrake Function
             The cdf F(y) of the random function Y(X).
         
+        Range_Y : dictionary
+            Range of the function Y(X).
+            This is used to determine the boundary conditions for f1(y).
+            
         Returns
         -------
         f : dict of firedrake Functions
-            The distribution f(φ) of the random function Y(X) as a distribution
-            in terms of fs(y) within the elements and fs(y) at element facets.
+            The distribution f[φ] of the random function Y(X) as a distribution
+            in terms of f0(y) within the elements and f1(y) at element facets.
         """
         
-        # Define trial & test functions on V_fc
-        u = TrialFunction(self.V_fc)
-        v = TestFunction(self.V_fc)
+        # ~~~~~~~~~~~~~~~~ f0(y) ~~~~~~~~~~~~~~~~
+        # Define trial & test functions on V_f0
+        u = TrialFunction(self.V_f0)
+        v = TestFunction(self.V_f0)
 
         # Construct the linear & bilinear forms
         a = inner(u, v)*dx
         L = inner(F.dx(0), v)*dx
         
-        # Solve for fc
-        fc = Function(self.V_fc)
-        solve(a == L, fc)
+        # Solve for f0
+        f0 = Function(self.V_f0)
+        solve(a == L, f0)
 
-        # Define trial & test functions on V_dirac
-        u = TrialFunction(self.V_fs)
-        v = TestFunction(self.V_fs)
+        # ~~~~~~~~~~~~~~~~ f1(y) ~~~~~~~~~~~~~~~~
+        # Define trial & test functions on V_f1
+        u = TrialFunction(self.V_f1)
+        v = TestFunction(self.V_f1)
 
-        # Define the variational form
-        a = inner(avg(u), avg(v))*dS + inner(u, v)*ds  # avg(v) = (v(+) + v(-))/2
-        L_internal = -(F('+')*v('+') - F('-')*v('-')) * dS
-        L_external = -((F-1)*v*ds(2) - (F-0)*v*ds(1))  # The jump at the end-points 
-        L = L_internal + L_external
-       
-        # Solve for fs
-        fs = Function(self.V_fs)
-        solve(a == L, fs)
+        # Define the variational form for the:
+        #      interior facets                 exterior facets
+        a = inner(avg(u),avg(v))*dS  +          inner(u,v)*ds
+        L = -jump(F)*avg(v)*dS       #-  ( L_right - L_left )
 
-        return {"fc": fc, "fs": fs}
+        # Apply the boundary conditions
+        if self.Omega_Y['Y'][0] <= Range_Y['Y_min']:
+            # Dirichlet BC at the left boundary
+            L_left = (F-0)*v*ds(1)
+            L += L_left
+        # else:
+        #     # Neumann BC at the left boundary
+        #     L_left = 0
+
+        if self.Omega_Y['Y'][1] >= Range_Y['Y_max']:
+            # Dirichlet BC at the right boundary
+            L_right = (F-1)*v*ds(2)        
+            L -= L_right        
+        # else:
+        #     # Neumann BC at the right boundary
+        #     L_right = 0
+
+        # Solve for f1
+        f1 = Function(self.V_f1)
+        solve(a == L, f1)
+
+        return {"f0": f0, "f1": f1}
 
     def _external_function(self, Y_numerical, quadrature_degree):
         """
@@ -549,7 +571,7 @@ class Ptp(object):
 
         return Y
 
-    def slope_limiter(self, F):
+    def slope_limiter(self, F, Range_Y):
         """
         Apply a slope limiter to ensure a non-decreasing cdf F(y).
         
@@ -600,8 +622,27 @@ class Ptp(object):
                 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
                 # (2) jumps
-                left = jump_condition(cell_n_em1[1], cell_n_e[0], cell_0_em1[1])
-                right = jump_condition(cell_n_e[1], cell_n_ep1[0], cell_0_e[1])
+                # Apply bcs and calculate the jump conditions & then take their minimum
+                if e == 0:
+                    if self.Omega_Y['Y'][0] <= Range_Y['Y_min']:
+                        # Dirichlet BC at the left most boundary F(-∞) = 0
+                        left = jump_condition(a_n_minus=cell_n_em1[1],a_n_plus=cell_n_e[0],a_0_minus=cell_0_em1[1])
+                    else:
+                        # Neumann BC no jump in F [[F]] = 0
+                        left = 0
+                else:
+                    left = jump_condition(cell_n_em1[1], cell_n_e[0], cell_0_em1[1])
+
+                if e == ne-1:
+                    if self.Omega_Y['Y'][1] >= Range_Y['Y_max']:
+                        # Dirichlet BC at the right most boundary F(+∞) = 1
+                        right = jump_condition(cell_n_e[1], cell_n_ep1[0], cell_0_e[1])
+                    else:
+                        # Neumann BC no jump in F [[F]] = 0
+                        right = 0
+                else:
+                    right = jump_condition(cell_n_e[1], cell_n_ep1[0], cell_0_e[1])
+
                 jumps[e] = min(left, right)
                 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -664,18 +705,17 @@ class Ptp(object):
             
         return F
 
-    def fit(self, Y, quadrature_degree=100):
+    def fit(self, Y, Range_Y={'Y_min': 0, 'Y_max': 1}, quadrature_degree=100):
         """
         Return the Density object correspoding to Y(X).
         
         Parameters
         ----------
         Y : UFL expression/callable
-            A UFL expression Y(X) terms of x_coords() with range Ω_Y or
-            a callable that returns Y(X_i) at the points {X_i} with range Ω_Y. 
-        Y : UFL expression/callable
-            A UFL expression Y(X) terms of x_coords() with range Ω_Y or
-            a callable that returns Y(X_i) at the points {X_i} with range Ω_Y. 
+            A UFL expression Y(X) terms of x_coords() or a callable that 
+            returns Y(X_i) at the points {X_i}. 
+        Range_Y :  dictionary
+            Range of the function Y(X).
         quadrature_degree : int
             Quadrature degree used to evaluate the projection of I(y,X).
         
@@ -693,7 +733,7 @@ class Ptp(object):
             raise ValueError('Expected a UFL expression or python callable \
                              recieved ', type(Y), '\n')
         y = self.y_coord()
-        F = self._cdf(self.map(Y_input), quadrature_degree)
+        F = self._cdf(self.map(Y_input), Range_Y, quadrature_degree)
         Q = self._qdf(F)
-        f = self._pdf(F)
+        f = self._pdf(F, Range_Y)
         return Density(self, y, F, Q, f)

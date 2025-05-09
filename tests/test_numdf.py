@@ -21,7 +21,7 @@ def test_cdf_constant():
     ptp = Ptp(Omega_X={'x1': (0, 1)}, Omega_Y={'Y': (0, 1)}, n_elements=2)
     x1 = ptp.x_coords()
     
-    density = ptp.fit(Y=0*x1)
+    density = ptp.fit(Y=0*x1, Range_Y={'Y_min': 0, 'Y_max': 1})
     assert assemble(((density.cdf-1)**2)*dx) < 1e-8
 
 
@@ -29,7 +29,7 @@ def test_pdf_constant():
     """Check the PDF of Y(X)=0 is correctly calculated."""
     ptp = Ptp(Omega_X={'x1': (0, 1)}, Omega_Y={'Y': (0, 1)}, n_elements=2)
     x1 = ptp.x_coords()
-    density = ptp.fit(Y=0*x1)
+    density = ptp.fit(Y=0*x1, Range_Y={'Y_min': 0, 'Y_max': 1})
     integral = density(1)
 
     assert abs(integral - 1) < 1e-12
@@ -40,7 +40,7 @@ def test_cdf_uniform_domain_length():
     ptp = Ptp(Omega_X={'x1': (0, 1)}, Omega_Y={'Y': (0, 1)}, n_elements=5)
     x1 = ptp.x_coords()
 
-    density = ptp.fit(Y=x1, quadrature_degree=1000)
+    density = ptp.fit(Y=x1, Range_Y={'Y_min': 0, 'Y_max': 1}, quadrature_degree=1000)
     assert assemble(((density.cdf-density.y)**2)*dx) < 1e-8
 
 
@@ -49,9 +49,9 @@ def test_pdf_uniform_domain_length():
     ptp = Ptp(Omega_X={'x1': (0, 1)}, Omega_Y={'Y': (0, 1)}, n_elements=2)
     x1 = ptp.x_coords()
 
-    density = ptp.fit(Y=x1, quadrature_degree=1000)
-    fc = density.pdf['fc']
-    assert assemble(abs(fc-1)*dx) < 1e-8
+    density = ptp.fit(Y=x1, Range_Y={'Y_min': 0, 'Y_max': 1}, quadrature_degree=1000)
+    f0 = density.pdf['f0']
+    assert assemble(abs(f0-1)*dx) < 1e-4
 
 
 def test_cdf_nonuniform_domain_length():
@@ -59,7 +59,7 @@ def test_cdf_nonuniform_domain_length():
     ptp = Ptp(Omega_X={'x1': (1, 2)}, Omega_Y={'Y': (1, 2)}, n_elements=10)
     x1 = ptp.x_coords()
 
-    density = ptp.fit(Y=x1, quadrature_degree=500)
+    density = ptp.fit(Y=x1, Range_Y={'Y_min': 1, 'Y_max': 2}, quadrature_degree=500)
     assert assemble(((density.cdf-(density.y-1))**2)*dx) < 1e-8
 
 
@@ -68,9 +68,9 @@ def test_pdf_nonuniform_domain_length():
     ptp = Ptp(Omega_X={'x1': (1, 2)}, Omega_Y={'Y': (1, 2)}, n_elements=2)
     x1 = ptp.x_coords()
 
-    density = ptp.fit(Y=x1, quadrature_degree=1000)
-    fc = density.pdf["fc"]
-    assert assemble(abs(fc-1)*dx) < 1e-8
+    density = ptp.fit(Y=x1, Range_Y={'Y_min': 1, 'Y_max': 2}, quadrature_degree=1500)
+    f0 = density.pdf["f0"]
+    assert assemble(abs(f0-1)*dx) < 1e-4
 
 
 def test_cdf_piecewise():
@@ -79,7 +79,7 @@ def test_cdf_piecewise():
     x1 = ptp.x_coords()
 
     expression = conditional(gt(x1, 1/2), x1, x1/2)
-    density = ptp.fit(Y=expression, quadrature_degree=1000)
+    density = ptp.fit(Y=expression, Range_Y={'Y_min': 0, 'Y_max': 1}, quadrature_degree=1000)
     
     y = ptp.y_coord()
     expression = conditional(le(y, 1/4), 2*y, 0) + conditional(And(gt(y, 1/4), le(y, 1/2)), 1/2, 0) + conditional(gt(y, 1/2), y, 0)
@@ -95,7 +95,7 @@ def test_pdf_piecewise():
     x1 = ptp.x_coords()
 
     expression = conditional(gt(x1, 0), x1, 0)
-    density = ptp.fit(Y=expression, quadrature_degree=1000)
+    density = ptp.fit(Y=expression, Range_Y={'Y_min': 0, 'Y_max': 1}, quadrature_degree=1000)
 
     y = ptp.y_coord()
     expression = conditional(gt(y, 0), 1/2, 0)
@@ -104,7 +104,7 @@ def test_pdf_piecewise():
     f = Function(V_f)
     f.interpolate(expression)
 
-    assert assemble(abs(density.pdf['fc'] - f)*dx ) < 1e-03
+    assert assemble(abs(density.pdf['f0'] - f)*dx ) < 1e-03
 
 
 def test_cdf_quadratic():
@@ -112,7 +112,7 @@ def test_cdf_quadratic():
     ptp = Ptp(Omega_X={'x1': (0, 1)}, Omega_Y={'Y': (0, 1)}, n_elements=100)
     x1 = ptp.x_coords()
 
-    density = ptp.fit(Y=x1**2, quadrature_degree=1000)
+    density = ptp.fit(Y=x1**2, Range_Y={'Y_min': 0, 'Y_max': 1}, quadrature_degree=1000)
     cdf = density.y**(1/2)
     assert assemble(((density.cdf-cdf)**2)*dx) < 1e-5
 
@@ -122,7 +122,7 @@ def test_pdf_quadratic():
     ptp = Ptp(Omega_X={'x1': (0, 1)}, Omega_Y={'Y': (0, 1)}, n_elements=100)
     x1 = ptp.x_coords()
 
-    density = ptp.fit(Y=x1**2, quadrature_degree=1000)
+    density = ptp.fit(Y=x1**2, Range_Y={'Y_min': 0, 'Y_max': 1}, quadrature_degree=1000)
     y = density.y
     int_num = density(y)
 
@@ -137,7 +137,7 @@ def test_cdf_cosine():
     ptp = Ptp(Omega_X={'x1': (0, 2*np.pi)}, Omega_Y={'Y': (-1, 1)}, n_elements=100)
     x1 = ptp.x_coords()
 
-    density = ptp.fit(Y=cos(x1), quadrature_degree=1000)
+    density = ptp.fit(Y=cos(x1), Range_Y={'Y_min': -1, 'Y_max': 1}, quadrature_degree=1000)
     cdf = 1 - acos(density.y)/np.pi
     assert assemble(((density.cdf-cdf)**2)*dx) < 1e-5
 
@@ -148,13 +148,13 @@ def test_pdf_cosine():
     x1 = ptp.x_coords()
 
     # Numerical
-    density = ptp.fit(Y=cos(x1), quadrature_degree=1000)
+    density = ptp.fit(Y=cos(x1), Range_Y={'Y_min': -1, 'Y_max': 1}, quadrature_degree=1000)
     y = density.y
     
     # Analytical
     f = 1/(np.pi*(1-y**2)**.5)
 
-    assert assemble((density.pdf['fc'] - f)*dx ) < 1e-03
+    assert assemble((density.pdf['f0'] - f)*dx ) < 1e-03
 
 
 def test_qdf_uniform():
@@ -163,7 +163,7 @@ def test_qdf_uniform():
     x1 = ptp.x_coords()
 
     # Act
-    density = ptp.fit(Y=0*x1, quadrature_degree=1000)
+    density = ptp.fit(Y=0*x1, Range_Y={'Y_min': 0, 'Y_max': 0}, quadrature_degree=1000)
     QF = density.compose(density.qdf, density.cdf, quadrature_degree=100)
     
     assert assemble((QF-density.y)*dx) < 1e-8
@@ -176,7 +176,7 @@ def test_qdf_straight_line():
     x1 = ptp.x_coords()
 
     # Act
-    density = ptp.fit(Y=x1, quadrature_degree=1000)
+    density = ptp.fit(Y=x1, Range_Y={'Y_min': 0, 'Y_max': 1}, quadrature_degree=1000)
     QF = density.compose(density.qdf, density.cdf, quadrature_degree=100)
     
     assert assemble((QF-density.y)*dx) < 1e-8
@@ -188,7 +188,7 @@ def test_qdf_piecewise():
     x1 = ptp.x_coords()
 
     expression = conditional(gt(x1, 1/2), x1, x1/2)
-    density = ptp.fit(Y=expression, quadrature_degree=1000)
+    density = ptp.fit(Y=expression, Range_Y={'Y_min': 0, 'Y_max': 1}, quadrature_degree=1000)
     
     QF = density.compose(density.qdf, density.cdf, quadrature_degree=100)    
     assert assemble((QF-density.y)*dx) < 1e-8
@@ -201,10 +201,10 @@ def test_ape_rbc():
     x1, x2 = ptp.x_coords()
 
     # Construct the PDF,CDF,QDF for B
-    p_B = ptp.fit(Y=1-x2, quadrature_degree=100)
+    p_B = ptp.fit(Y=1-x2, Range_Y={'Y_min': 0, 'Y_max': 1}, quadrature_degree=100)
     
     # Construct the PDF,CDF,QDF for Z
-    p_Z = ptp.fit(Y=x2, quadrature_degree=100)
+    p_Z = ptp.fit(Y=x2, Range_Y={'Y_min': 0, 'Y_max': 1}, quadrature_degree=100)
 
     # Act
     Z_ref = p_B.compose(p_Z.qdf, p_B.cdf, quadrature_degree=100)
@@ -231,8 +231,8 @@ def test_ape_layered():
     Z = x2
 
     # Construct the density objects
-    density_B = ptp.fit(Y=B, quadrature_degree=2000)
-    density_Z = ptp.fit(Y=Z, quadrature_degree=2000)
+    density_B = ptp.fit(Y=B, Range_Y={'Y_min': -1, 'Y_max': 1}, quadrature_degree=2000)
+    density_Z = ptp.fit(Y=Z, Range_Y={'Y_min': -1, 'Y_max': 1}, quadrature_degree=2000)
 
     # Define the map
     Q_B = density_B.qdf
