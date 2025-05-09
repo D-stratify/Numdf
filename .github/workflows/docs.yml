@@ -28,7 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: firedrakeproject/firedrake:latest
-      options: --user root
+      #options: --user root
     
     # Steps represent a sequence of tasks that will be executed as
     # part of the jobs
