@@ -27,8 +27,8 @@ jobs:
     name: Run doc build
     runs-on: ubuntu-latest
     container:
-      image: firedrakeproject/firedrake-docdeps:latest
-      #options: --user root
+      image: firedrakeproject/firedrake:latest
+      options: --user root
     
     # Steps represent a sequence of tasks that will be executed as
     # part of the jobs
@@ -36,7 +36,8 @@ jobs:
       
       # This is an action that checks out your repository onto the runner, 
       # allowing you to run scripts or other actions against your code (such as build and test tools)
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
     
       # Activate firedrake and install dependencies
       - name: Install NumDF
@@ -45,6 +46,8 @@ jobs:
 
       - name: Build docs
         run: |
+          python3 -m pip install sphinx
+          python3 -m pip install sphinx_rtd_theme
           cd docs
           make html
       
