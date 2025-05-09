@@ -9,7 +9,7 @@ NumDF is written in python and makes extensive use of the finite element method 
 
 **Links**
 =========
-* Code repository: https://github.com/D-stratify
+* Code repository: https://github.com/D-stratify/Numdf/
 * Documentation: https://d-stratify.github.io/Numdf/
 
 **Developers**
