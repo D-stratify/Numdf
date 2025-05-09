@@ -36,9 +36,18 @@ jobs:
       
       # This is an action that checks out your repository onto the runner, 
       # allowing you to run scripts or other actions against your code (such as build and test tools)
-      - name: Checkout
-        uses: actions/checkout@v4
-      
+      - uses: actions/checkout@v4
+      - name: Setup python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.13
+
+      # Install dependencies
+      - name: Install dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          pip install sphinx
+
       # Activate firedrake and install dependencies
       - name: Install NumDF
         run: |
